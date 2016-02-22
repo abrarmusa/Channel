@@ -1,6 +1,7 @@
 # README.md
 
-`Project notes to be placed here.`
+### Repository details
+`/proposal`: holds the proposal pdf and latex files
 
 ### Important dates
 - Feb. 22: proposal draft due

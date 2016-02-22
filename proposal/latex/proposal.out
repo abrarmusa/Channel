@@ -1,0 +1,15 @@
+\BOOKMARK [1][-]{section.1}{Introduction}{}% 1
+\BOOKMARK [1][-]{section.2}{Implementation Strategy}{}% 2
+\BOOKMARK [2][-]{subsection.2.1}{Software engineering practices}{section.2}% 3
+\BOOKMARK [2][-]{subsection.2.2}{Construction of a single, centralized server, and requesting clients}{section.2}% 4
+\BOOKMARK [2][-]{subsection.2.3}{Stream forwarding policies}{section.2}% 5
+\BOOKMARK [2][-]{subsection.2.4}{P2P streaming, edge case failures, and application level functionality}{section.2}% 6
+\BOOKMARK [2][-]{subsection.2.5}{Project deployment and extras}{section.2}% 7
+\BOOKMARK [1][-]{section.3}{Project Timeline}{}% 8
+\BOOKMARK [1][-]{section.4}{SWOT Analysis}{}% 9
+\BOOKMARK [2][-]{subsection.4.1}{Strengths}{section.4}% 10
+\BOOKMARK [2][-]{subsection.4.2}{Weaknesses}{section.4}% 11
+\BOOKMARK [2][-]{subsection.4.3}{Opportunities}{section.4}% 12
+\BOOKMARK [2][-]{subsection.4.4}{Threats}{section.4}% 13
+\BOOKMARK [1][-]{section.5}{Conclusion}{}% 14
+\BOOKMARK [1][-]{section*.2}{References}{}% 15
