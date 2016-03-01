@@ -154,11 +154,11 @@ To detect failures, heartbeat messages will be sent from predecessor to successo
 
 \subsection{Media streaming and delivery}
 
-Given that some nodes have stored in them a multimedia file, such as video, when the client wants to stream a video from its peers, it will do a lookup on the finger table to obtain the id of the node that has the file. Once a node is obtained, a lookup on the finger table of that node for another node that has the video file will be done. In doing so, once a certain number of nodes for the file is obtained, a stream to the video is initialized, which will be done in terms of a sequence of frames. 
+Some nodes have stored in them a multimedia file, such as an MPEG file, and when a client wants to stream a video from its peers, it will do a lookup on the finger table to obtain the id of the node that has the file. Once a node is obtained, a lookup on the finger table of that node for another node that has the video file will be done. In doing so, once a certain number of nodes for the file is obtained, a stream to the video is initialized, which will be done in terms of a sequence of frames. 
 
-A queue to store a list of all the frames of the video will be used and we will keep asking the connected nodes for the frames in sequence. In the case where a later frame is obtained sooner than an earlier frame, the frame is stored in a buffer and the playback of the frames will occur only once an ordered sequence has been obtained. 
+A queue to store a list of all the frames of the video will be used and will keep asking the connected nodes for the frames in sequence. In the case where a later frame is obtained sooner than an earlier frame, the frame is stored in a buffer and the playback of the frames will occur only once an ordered sequence has been obtained. 
 
-In the case where nodes that were sending frames die or leave the network, the frame requests are redistributed across other available and connected nodes. In the case where all nodes except for the client are lost, lookups on the finger table will be performed for live nodes that contain the file, and once at least one live node is obtained, send the node the frame request again. This assumes consistency across all the nodes in terms of finger tables.
+In the case where nodes that were sending frames die or leave the network, the frame requests are redistributed across other available and connected nodes. In the exceptional case where all nodes except for the client are lost, lookups on the finger table will be performed for alive nodes that contain the file, and once at least one alive node is obtained, send the node the frame request again. This assumes consistency across all the nodes in terms of finger tables.
 
 \subsection{Challenges and related issues}
 
@@ -181,7 +181,7 @@ To allow as much time as possible for polishing, debugging, and unforeseeable ev
 \section{SWOT Analysis}
 
 \subsection{Strengths}
-A lot of research material is available in regards to the Chord DHT implementation as well as several available lectures and notes on the subject.Additional strengths include disciplined team members as well as flexible and open meeting hours. Team members are also familiar with other programming languages such as C, Java, C++, Python, Ruby, Prolog and Haskell, and so code optimization ideas can be transferred over from that knowledge of other languages.
+A lot of research material is available in regards to the Chord DHT implementation as well as several available lectures and notes on the subject.Additional strengths include disciplined team members as well as flexible and open meeting hours. The team members are also familiar with other programming languages such as C, Java, C++, Python, Ruby, Prolog and Haskell, and so code optimization ideas can be transferred over from that knowledge of other languages.
 
 \subsection{Weaknesses}
 The system will be difficult to test for a large number of nodes due to limited availability of resources such as a large number of computers/nodes which would be used to test our system under ideal conditions. A significant weakness is that all team members are completely new to distributed systems and as a result, implementation of features of the system will require a lot of additional research and testing.
