@@ -3,44 +3,51 @@ Capacity: max_strings=35307, hash_size=35307, hash_prime=30011
 The top-level auxiliary file: proposal.aux
 The style file: unsrt.bst
 Database file #1: sample.bib
-You've used 3 entries,
+Warning--I didn't find a database entry for "3"
+Warning--I didn't find a database entry for "4"
+Name 1 in "I. Stoica, R. Morris, D. Karger, M. F. Kaashoek, and H. Bal- akrishnan." has a comma at the end for entry 2
+while executing---line 944 of file unsrt.bst
+Too many commas in name 1 of "I. Stoica, R. Morris, D. Karger, M. F. Kaashoek, and H. Bal- akrishnan." for entry 2
+while executing---line 944 of file unsrt.bst
+You've used 2 entries,
             1791 wiz_defined-function locations,
-            459 strings with 3979 characters,
-and the built_in function-call counts, 434 in all, are:
-= -- 39
+            456 strings with 3906 characters,
+and the built_in function-call counts, 314 in all, are:
+= -- 27
 > -- 12
 < -- 0
-+ -- 6
++ -- 5
 - -- 3
-* -- 5
-:= -- 75
-add.period$ -- 12
-call.type$ -- 3
-change.case$ -- 3
+* -- 6
+:= -- 56
+add.period$ -- 8
+call.type$ -- 2
+change.case$ -- 2
 chr.to.int$ -- 0
-cite$ -- 3
-duplicate$ -- 15
-empty$ -- 55
+cite$ -- 2
+duplicate$ -- 10
+empty$ -- 37
 format.name$ -- 3
-if$ -- 100
+if$ -- 71
 int.to.chr$ -- 0
-int.to.str$ -- 3
+int.to.str$ -- 2
 missing$ -- 0
-newline$ -- 21
-num.names$ -- 3
-pop$ -- 18
+newline$ -- 15
+num.names$ -- 2
+pop$ -- 12
 preamble$ -- 1
 purify$ -- 0
 quote$ -- 0
-skip$ -- 6
+skip$ -- 5
 stack$ -- 0
 substring$ -- 0
-swap$ -- 3
+swap$ -- 2
 text.length$ -- 0
 text.prefix$ -- 0
 top$ -- 0
 type$ -- 0
 warning$ -- 0
-while$ -- 3
-width$ -- 4
-write$ -- 38
+while$ -- 2
+width$ -- 3
+write$ -- 26
+(There were 2 error messages)

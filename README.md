@@ -2,6 +2,7 @@
 
 ### Repository details
 `/proposal`: holds the proposal pdf and latex files
+`/src`: contains Go source files
 
 ### Important dates
 - Feb. 22: proposal draft due

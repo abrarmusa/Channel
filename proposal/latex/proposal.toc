@@ -1,17 +1,17 @@
 \select@language {english}
 \contentsline {section}{\numberline {1}Introduction}{1}{section.1}
 \contentsline {section}{\numberline {2}Implementation Strategy}{1}{section.2}
-\contentsline {subsection}{\numberline {2.1}Software engineering practices}{2}{subsection.2.1}
-\contentsline {subsection}{\numberline {2.2}Construction of a single, centralized server, and requesting clients}{2}{subsection.2.2}
-\contentsline {subsection}{\numberline {2.3}Stream forwarding policies}{2}{subsection.2.3}
-\contentsline {subsection}{\numberline {2.4}P2P streaming, edge case failures, and application level functionality}{2}{subsection.2.4}
-\contentsline {subsection}{\numberline {2.5}Project deployment and extras}{2}{subsection.2.5}
-\contentsline {section}{\numberline {3}Project Timeline}{2}{section.3}
-\contentsline {section}{\numberline {4}SWOT Analysis}{2}{section.4}
-\contentsline {subsection}{\numberline {4.1}Strengths}{2}{subsection.4.1}
-\contentsline {subsection}{\numberline {4.2}Weaknesses}{2}{subsection.4.2}
-\contentsline {subsection}{\numberline {4.3}Opportunities}{2}{subsection.4.3}
-\contentsline {subsection}{\numberline {4.4}Threats}{2}{subsection.4.4}
-\contentsline {section}{\numberline {5}Conclusion}{2}{section.5}
-\contentsline {section}{References}{3}{section*.2}
+\contentsline {subsection}{\numberline {2.1}DHT system structure/overlay and file storage}{1}{subsection.2.1}
+\contentsline {subsection}{\numberline {2.2}Node subscription}{2}{subsection.2.2}
+\contentsline {subsection}{\numberline {2.3}Node exit and failures}{2}{subsection.2.3}
+\contentsline {subsection}{\numberline {2.4}Media streaming and delivery}{3}{subsection.2.4}
+\contentsline {subsection}{\numberline {2.5}Challenges and related issues}{3}{subsection.2.5}
+\contentsline {section}{\numberline {3}Project Timeline}{3}{section.3}
+\contentsline {section}{\numberline {4}SWOT Analysis}{4}{section.4}
+\contentsline {subsection}{\numberline {4.1}Strengths}{4}{subsection.4.1}
+\contentsline {subsection}{\numberline {4.2}Weaknesses}{4}{subsection.4.2}
+\contentsline {subsection}{\numberline {4.3}Opportunities}{4}{subsection.4.3}
+\contentsline {subsection}{\numberline {4.4}Threats}{4}{subsection.4.4}
+\contentsline {section}{\numberline {5}Conclusion}{4}{section.5}
+\contentsline {section}{References}{4}{section*.6}
 \contentsfinish 

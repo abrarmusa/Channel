@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.1415926-2.5-1.40.14 (TeX Live 2013/Debian) (format=pdflatex 2014.11.5)  22 FEB 2016 13:12
+This is pdfTeX, Version 3.1415926-2.5-1.40.14 (TeX Live 2013/Debian) (format=pdflatex 2014.11.5)  29 FEB 2016 19:47
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -718,7 +718,20 @@ Package csquotes Info: ... found 'babel' package.
 LaTeX Warning: Unused global option(s):
     [24pt].
 
-(./proposal.aux)
+(./proposal.aux
+
+LaTeX Warning: Label `family' multiply defined.
+
+
+LaTeX Warning: Label `family' multiply defined.
+
+
+LaTeX Warning: Label `family' multiply defined.
+
+
+LaTeX Warning: Label `family' multiply defined.
+
+)
 \openout1 = `proposal.aux'.
 
 LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 85.
@@ -922,24 +935,60 @@ LaTeX Font Info:    Font shape `OT1/phv/bx/n' in size <12> not available
 \tf@toc=\write4
 \openout4 = `proposal.toc'.
 
- <images/Selection_148.png, id=96, 242.40562pt x 127.22531pt>
-File: images/Selection_148.png Graphic file (type png)
+ <images/Selection_152.png, id=95, 255.95625pt x 200.24812pt>
+File: images/Selection_152.png Graphic file (type png)
 
-<use images/Selection_148.png>
-Package pdftex.def Info: images/Selection_148.png used on input line 110.
-(pdftex.def)             Requested size: 242.40501pt x 127.22499pt.
- [1{/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}
+<use images/Selection_152.png>
+Package pdftex.def Info: images/Selection_152.png used on input line 110.
+(pdftex.def)             Requested size: 255.95561pt x 200.24763pt.
+
+Overfull \hbox (13.53816pt too wide) in paragraph at lines 110--111
+[][] 
+ []
+
+[1{/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}
 
 
 ]
-Overfull \hbox (0.88365pt too wide) in paragraph at lines 120--120
- |[]\OT1/phv/b/n/10 Construction of a sin-gle, cen-tral-ized server, and
+<images/Selection_155.png, id=112, 213.04594pt x 191.9672pt>
+File: images/Selection_155.png Graphic file (type png)
+
+<use images/Selection_155.png>
+Package pdftex.def Info: images/Selection_155.png used on input line 126.
+(pdftex.def)             Requested size: 213.04541pt x 191.96672pt.
+
+<images/Selection_153.png, id=115, 263.48438pt x 211.54031pt>
+File: images/Selection_153.png Graphic file (type png)
+
+<use images/Selection_153.png>
+Package pdftex.def Info: images/Selection_153.png used on input line 134.
+(pdftex.def)             Requested size: 263.48372pt x 211.53978pt.
+
+Overfull \hbox (21.06627pt too wide) in paragraph at lines 134--135
+[][] 
  []
 
-[2 <./images/Selection_148.png>] (./proposal.bbl
-LaTeX Font Info:    Try loading font information for OT1+pcr on input line 6.
+<images/2016-02-29.png, id=117, 263.48438pt x 195.73125pt>
+File: images/2016-02-29.png Graphic file (type png)
 
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/ot1pcr.fd
+<use images/2016-02-29.png>
+Package pdftex.def Info: images/2016-02-29.png used on input line 144.
+(pdftex.def)             Requested size: 263.48372pt x 195.73076pt.
+
+Overfull \hbox (21.06627pt too wide) in paragraph at lines 144--145
+[][] 
+ []
+
+[2 <./images/Selection_152.png> <./images/Selection_155.png> <./images/Selectio
+n_153.png>] <images/stabilize1.png, id=136, 225.84375pt x 200.24812pt>
+File: images/stabilize1.png Graphic file (type png)
+
+<use images/stabilize1.png>
+Package pdftex.def Info: images/stabilize1.png used on input line 168.
+(pdftex.def)             Requested size: 225.84319pt x 200.24763pt.
+ [3 <./images/2016-02-29.png> <./images/stabilize1.png>] (./proposal.bbl
+LaTeX Font Info:    Try loading font information for OT1+pcr on input line 8.
+ (/usr/share/texlive/texmf-dist/tex/latex/psnfss/ot1pcr.fd
 File: ot1pcr.fd 2001/06/04 font definitions for OT1/pcr.
 )
 Package microtype Info: Loading generic settings for font family
@@ -947,64 +996,57 @@ Package microtype Info: Loading generic settings for font family
 (microtype)             For optimal results, create family-specific settings.
 (microtype)             See the microtype manual for details.
 
-Underfull \hbox (badness 10000) in paragraph at lines 4--8
-[]\OT1/ptm/m/n/10 (+20) H Desh-pande.  Stream-ing live me-dia over
+Underfull \hbox (badness 2050) in paragraph at lines 4--11
+\OT1/ptm/m/n/10 (+20) lookup ser-vice for in-ter-net ap-pli-ca-tions.  [][]$\OT
+1/pcr/m/n/10 https :
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 4--8
-\OT1/ptm/m/n/10 (+20) peers.  [][]$\OT1/pcr/m/n/10 http : / / ilpubs . stanford
- . edu :
+Underfull \hbox (badness 10000) in paragraph at lines 4--11
+\OT1/pcr/m/n/10 / / pdos . csail . mit . edu / papers / chord :
  []
 
 
-Underfull \hbox (badness 4779) in paragraph at lines 4--8
-\OT1/pcr/m/n/10 8090 / 863 / 1 / 2002-[]21 . pdf$[][]\OT1/ptm/m/n/10 (+20) , 20
-02.  Ac-cessed:
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 10--17
-[][]$\OT1/pcr/m/n/10 http : / / research . microsoft . com / en-[]us /
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 10--17
-\OT1/pcr/m/n/10 um / people / antr / PAST / pastry . pdf$[][]\OT1/ptm/m/n/10 (+
-20) , 2001.
+Underfull \hbox (badness 3138) in paragraph at lines 4--11
+\OT1/pcr/m/n/10 sigcomm01 / chord _ sigcomm . pdf$[][]\OT1/ptm/m/n/10 (+20) , 2
+001.  Ac-
  []
 
 ) 
 AED: lastpage setting LastPage
-[3
-
-]
-Package atveryend Info: Empty hook `BeforeClearDocument' on input line 160.
-Package atveryend Info: Empty hook `AfterLastShipout' on input line 160.
+[4]
+Package atveryend Info: Empty hook `BeforeClearDocument' on input line 205.
+Package atveryend Info: Empty hook `AfterLastShipout' on input line 205.
  (./proposal.aux)
-Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 160.
-Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 160.
+Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 205.
+Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 205.
 Package rerunfilecheck Info: File `proposal.out' has not changed.
-(rerunfilecheck)             Checksum: C6EEAABAFFC773DEB2F120F4FDDBF15F;1004.
+(rerunfilecheck)             Checksum: 60750AC70EB5F936EF6ACD6C319690C1;922.
+
+
+LaTeX Warning: There were multiply-defined labels.
+
  ) 
 Here is how much of TeX's memory you used:
- 12195 strings out of 493304
- 180416 string characters out of 6139871
- 332941 words of memory out of 5000000
- 15254 multiletter control sequences out of 15000+600000
- 55172 words of font info for 204 fonts, out of 8000000 for 9000
+ 12239 strings out of 493304
+ 181126 string characters out of 6139871
+ 333608 words of memory out of 5000000
+ 15273 multiletter control sequences out of 15000+600000
+ 58013 words of font info for 217 fonts, out of 8000000 for 9000
  957 hyphenation exceptions out of 8191
- 43i,11n,51p,815b,408s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 43i,11n,51p,940b,406s stack positions out of 5000i,500n,10000p,200000b,80000s
 {/usr/share/texlive/texmf-dist/fonts/enc/dvips/base/8r.enc}</usr/share/texliv
-e/texmf-dist/fonts/type1/urw/courier/ucrr8a.pfb></usr/share/texlive/texmf-dist/
-fonts/type1/urw/helvetic/uhvb8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/
-urw/helvetic/uhvr8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/helvetic
-/uhvro8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></
-usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmr8a.pfb>
-Output written on proposal.pdf (3 pages, 89423 bytes).
+e/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/share/texlive/texm
+f-dist/fonts/type1/urw/courier/ucrr8a.pfb></usr/share/texlive/texmf-dist/fonts/
+type1/urw/helvetic/uhvb8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/he
+lvetic/uhvr8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/helvetic/uhvro
+8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/sh
+are/texlive/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/share/texlive/tex
+mf-dist/fonts/type1/urw/times/utmri8a.pfb>
+Output written on proposal.pdf (4 pages, 206560 bytes).
 PDF statistics:
- 163 PDF objects out of 1000 (max. 8388607)
- 133 compressed objects within 2 object streams
- 23 named destinations out of 1000 (max. 500000)
- 48254 words of extra memory for PDF output out of 51595 (max. 10000000)
+ 194 PDF objects out of 1000 (max. 8388607)
+ 152 compressed objects within 2 object streams
+ 27 named destinations out of 1000 (max. 500000)
+ 48274 words of extra memory for PDF output out of 51595 (max. 10000000)
 
