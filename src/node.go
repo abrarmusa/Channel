@@ -136,13 +136,14 @@ func connectToSystem(id string) {
  */
 func main() {
   // Handle the command line.
-  if len(os.Args) > 4 || len(os.Args) < 3 {
+  if len(os.Args) > 5 || len(os.Args) < 3 {
     fmt.Println("Usage: go run node.go [node ip:port] [starter-node ip:port] [-r=replicationFactor] [-t]")
     os.Exit(-1)
   } else {
     nodeAddr = os.Args[1] // ip:port of this node
     startAddr = os.Args[2] // ip:port of initial node
     flag.IntVar(&replicationFactor, "r", 2, "replication factor")
+    flag.BoolVar(&traceMode, "t", false, "trace mode")
     flag.Parse()
   }
 
