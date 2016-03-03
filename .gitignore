@@ -1,5 +1,6 @@
 *.mp4
 *.txt
+pkg/*
 
 # Yodel eh hee hoo, some evil extensions below
 *.exe

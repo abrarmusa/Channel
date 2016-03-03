@@ -24,7 +24,7 @@ import (
   "encoding/hex"
   "flag"
   "fmt"
-  //"net"
+	"transfile"
   "os"
   "sync"
 )
@@ -146,6 +146,14 @@ func main() {
     flag.BoolVar(&traceMode, "t", false, "trace mode")
     flag.Parse()
   }
+
+	// Setup UDP server and know the port num
+	port := transfile.SetupUdpPort()
+	fmt.Println("This UDP server port is", port) //e.g. ":12345"
+	
+	/*
+	This port num is to be advertised as part of finger
+	*/
 
   // Get this node's IP hash, which will be used as its ID.
   id := computeSHA1Hash(nodeAddr)
