@@ -147,12 +147,17 @@ func main() {
     flag.Parse()
   }
 
-	// Setup UDP server and know the port num
-	port := transfile.SetupUdpPort()
-	fmt.Println("This UDP server port is", port) //e.g. ":12345"
+	// Setup UDP server
+	u := transfile.UdpInfo{
+		Conn: nil,
+		Port: ":0",
+	}
+	u.SetupUdp()
+	defer u.Conn.Close()
+	fmt.Println("This UDP:", u)
 	
 	/*
-	This port num is to be advertised as part of finger
+	New u.Port is to be advertised as part of finger
 	*/
 
   // Get this node's IP hash, which will be used as its ID.
