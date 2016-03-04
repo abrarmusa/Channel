@@ -153,11 +153,11 @@ func main() {
 		Port: ":0",
 	}
 	u.SetupUdp()
-	defer u.Conn.Close()
 	fmt.Println("This UDP:", u)
 	
 	/*
-	New u.Port is to be advertised as part of finger
+	(1) New u.Port is to be advertised as part of finger
+	(2) Send data like this: u.SendUdpCall("198.162.33.54:40465")
 	*/
 
   // Get this node's IP hash, which will be used as its ID.
@@ -165,4 +165,7 @@ func main() {
 
   // Join the identifier circle.
   connectToSystem(id)
+
+	go u.ReceiveUdpCall() // infinite waiting & receiving
+	transfile.StayLive()
 }

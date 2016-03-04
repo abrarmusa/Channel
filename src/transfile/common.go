@@ -11,3 +11,8 @@ func checkError(err error) {
 		os.Exit(-1)
 	}
 }
+
+func StayLive() {
+	var temp string
+	fmt.Scanln(&temp)
+}
