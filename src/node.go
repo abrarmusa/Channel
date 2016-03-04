@@ -24,9 +24,9 @@ import (
   "encoding/hex"
   "flag"
   "fmt"
-	"transfile"
   "os"
   "sync"
+  "transfile"
 )
 
 // =======================================================================
@@ -147,18 +147,18 @@ func main() {
     flag.Parse()
   }
 
-	// Setup UDP server
-	u := transfile.UdpInfo{
-		Conn: nil,
-		Port: ":0",
-	}
-	u.SetupUdp()
-	fmt.Println("This UDP:", u)
-	
-	/*
-	(1) New u.Port is to be advertised as part of finger
-	(2) Send data like this: u.SendUdpCall("198.162.33.54:40465")
-	*/
+  // Setup UDP server
+  u := transfile.UdpInfo{
+    Conn: nil,
+    Port: ":0",
+  }
+  u.SetupUdp()
+  fmt.Println("This UDP:", u)
+
+  /*
+  (1) New u.Port is to be advertised as part of finger
+  (2) Send data like this: u.SendUdpCall("198.162.33.54:40465")
+  */
 
   // Get this node's IP hash, which will be used as its ID.
   id := computeSHA1Hash(nodeAddr)
@@ -166,6 +166,6 @@ func main() {
   // Join the identifier circle.
   connectToSystem(id)
 
-	go u.ReceiveUdpCall() // infinite waiting & receiving
-	transfile.StayLive()
+  go u.ReceiveUdpCall() // infinite waiting & receiving
+  transfile.StayLive()
 }
