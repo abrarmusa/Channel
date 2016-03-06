@@ -22,10 +22,12 @@ package main
 import (
   "crypto/sha1"
   "encoding/hex"
+  "encoding/json"
   "flag"
   "fmt"
-  //"net"
+  "net"
   "os"
+  "time"
   "sync"
 )
 
@@ -34,13 +36,11 @@ import (
 // =======================================================================
 // Some types used for RPC communication.
 type nodeRPCService int
-type ValReply struct {
-  Val string
+type NodeMessage struct {
+  Msg string
 }
 
 // Some static command line options.
-var nodeAddr string
-var startAddr string
 var traceMode bool
 var replicationFactor int
 
@@ -126,10 +126,49 @@ func computeDistBetweenTwoHashes(key1 string, key2 string) int64 {
   return 69
 }
 
-/* Attempt to join the system, if this is the first node, start it up.
+/* Send periodic heartbeats to let predecessor know this node is still alive.
  */
-func connectToSystem(id string) {
-  // todo
+func sendAliveMessage(conn *net.TCPConn, id string) {
+  for {
+    // send this node's id as an alive message
+    msg := NodeMessage{id}
+    aliveMessage, err := json.Marshal(msg)
+    checkError(err)
+    b := []byte(aliveMessage)
+    _, err = conn.Write(b)
+    checkError(err)
+
+    time.Sleep(5 * time.Second)
+  }
+}
+
+/* Perform recursive search through finger tables to place me at the right spot.
+ */
+func locateSuccessor(conn *net.TCPConn, id string) *net.TCPConn {
+  // recursive search through finger tables
+  // use computeDistBetweenTwoHashes(key1 string, key2 string)
+  return nil
+}
+
+/* Attempt to join the system given the ip:port of a running node.
+ */
+func connectToSystem(nodeAddr string, startAddr string) {
+  // Get this node's IP hash, which will be used as its ID.
+  id := computeSHA1Hash(nodeAddr)
+
+  nodeTCPAddr, err := net.ResolveTCPAddr("tcp", nodeAddr)
+  checkError(err)
+  startTCPAddr, err := net.ResolveTCPAddr("tcp", startAddr)
+  checkError(err)
+
+  // Figure out where I am in the identifier circle.
+  conn, err := net.DialTCP("tcp", nodeTCPAddr, startTCPAddr)
+  defer conn.Close()
+  successorConn := locateSuccessor(conn, id)
+
+  // Send a heartbeat every 5 secs. The successor will start tracking this
+  // node if it hadn't sent an alive message before.
+  go sendAliveMessage(successorConn, id)
 }
 
 /* The main function.
@@ -140,16 +179,13 @@ func main() {
     fmt.Println("Usage: go run node.go [node ip:port] [starter-node ip:port] [-r=replicationFactor] [-t]")
     os.Exit(-1)
   } else {
-    nodeAddr = os.Args[1] // ip:port of this node
-    startAddr = os.Args[2] // ip:port of initial node
+    nodeAddr := os.Args[1] // ip:port of this node
+    startAddr := os.Args[2] // ip:port of initial node
     flag.IntVar(&replicationFactor, "r", 2, "replication factor")
     flag.BoolVar(&traceMode, "t", false, "trace mode")
     flag.Parse()
+
+    // Join the identifier circle.
+    connectToSystem(nodeAddr, startAddr)
   }
-
-  // Get this node's IP hash, which will be used as its ID.
-  id := computeSHA1Hash(nodeAddr)
-
-  // Join the identifier circle.
-  connectToSystem(id)
 }
