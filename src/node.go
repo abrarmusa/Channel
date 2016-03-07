@@ -39,6 +39,9 @@ type nodeRPCService int
 type NodeMessage struct {
   Msg string
 }
+type ConnResponse struct {
+  Conn *net.TCPConn
+}
 
 // Some static command line options.
 var traceMode bool
@@ -58,7 +61,7 @@ var lock = struct {
 /* Updates or inserts a finger table entry at this node. Called by other nodes.
  */
 func (this *nodeRPCService) UpdateFingerTableEntry(id string, addr string,
-  reply *ValReply) error {
+  reply *NodeMessage) error {
   // Lock 'em up.
   lock.Lock()
   defer lock.Unlock()
@@ -67,27 +70,27 @@ func (this *nodeRPCService) UpdateFingerTableEntry(id string, addr string,
   lock.fingerTable[id] = addr
 
   // Let the other guy know it went well.
-  reply.Val = "Ok"
+  reply.Msg = "Ok"
   return nil
 }
 
 /* Grabs a finger table entry at this node. Called by other nodes.
  */
 func (this *nodeRPCService) GetFingerTableEntry(id string,
-  reply *ValReply) error {
+  reply *NodeMessage) error {
   // Lock 'em up (read mode).
   lock.RLock()
   defer lock.RUnlock()
 
   // Send the value of the entry that some guy requested.
-  reply.Val = lock.fingerTable[id]
+  reply.Msg = lock.fingerTable[id]
   return nil
 }
 
 /* Removes a finger table entry at this node. Called by other nodes.
  */
 func (this *nodeRPCService) DeleteFingerTableEntry(id string,
-  reply *ValReply) error {
+  reply *NodeMessage) error {
   // Lock 'em up.
   lock.Lock()
   defer lock.Unlock()
@@ -96,7 +99,7 @@ func (this *nodeRPCService) DeleteFingerTableEntry(id string,
   delete(lock.fingerTable, id)
 
   // Let the other guy know it went well.
-  reply.Val = "Ok"
+  reply.Msg = "Ok"
   return nil
 }
 
@@ -147,7 +150,37 @@ func sendAliveMessage(conn *net.TCPConn, id string) {
 func locateSuccessor(conn *net.TCPConn, id string) *net.TCPConn {
   // recursive search through finger tables
   // use computeDistBetweenTwoHashes(key1 string, key2 string)
-  return nil
+
+  // Send a special message of value "where", so that node knows it wants to find its place in the identifier circle.
+  msg := NodeMessage{"where"}
+  msgInJSON, err := json.Marshal(msg)
+  checkError(err)
+  buf := []byte(msgInJSON)
+  // The listening function should have an interface{} to deal with a "where" message.
+  // Handle this write in the listenForControlMessages function
+  _, err = conn.Write(buf)
+  checkError(err)
+
+  // The response should hold the conn of the successor.
+  n, err := conn.Read(buf)
+  checkError(err)
+  var successor ConnResponse
+  err = json.Unmarshal(buf[:n], &successor)
+  checkError(err)
+
+  return successor.Conn
+}
+
+/* Handle messages from .
+ */
+func listenForControlMessages(nodeAddr string) {
+  // Todo
+}
+
+/* Only called when there are no nodes yet that are started up. This node becomes the first node.
+ */
+func startUpSystem(nodeAddr string) {
+  // Todo
 }
 
 /* Attempt to join the system given the ip:port of a running node.
@@ -163,12 +196,19 @@ func connectToSystem(nodeAddr string, startAddr string) {
 
   // Figure out where I am in the identifier circle.
   conn, err := net.DialTCP("tcp", nodeTCPAddr, startTCPAddr)
-  defer conn.Close()
   successorConn := locateSuccessor(conn, id)
+
+  // Don't need this conn object anymore.
+  if successorConn != conn {
+    defer conn.Close()
+  }
 
   // Send a heartbeat every 5 secs. The successor will start tracking this
   // node if it hadn't sent an alive message before.
   go sendAliveMessage(successorConn, id)
+
+  // Listen for TCP message requests to this node.
+  listenForControlMessages(nodeAddr)
 }
 
 /* The main function.
@@ -185,7 +225,13 @@ func main() {
     flag.BoolVar(&traceMode, "t", false, "trace mode")
     flag.Parse()
 
-    // Join the identifier circle.
-    connectToSystem(nodeAddr, startAddr)
+    // Set both args as equal on the command line if no node is operational yet.
+    // Need to start up a source node (this) first.
+    if (nodeAddr == startAddr) {
+      startUpSystem(nodeAddr)
+    // Else join an existing identifier circle, given the address of a node that is running.
+    } else {
+      connectToSystem(nodeAddr, startAddr)
+    }
   }
 }
