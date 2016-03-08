@@ -235,4 +235,20 @@ func main() {
       connectToSystem(nodeAddr, startAddr)
     }
   }
+
+  // Setup UDP server
+  u := transfile.UdpInfo{
+    Conn: nil,
+    Port: ":0",
+  }
+  u.SetupUdp()
+  fmt.Println("This UDP:", u)
+
+  /*
+  (1) New u.Port is to be advertised as part of finger
+  (2) Send data like this: u.SendUdpCall("198.162.33.54:40465")
+  */
+
+	go u.ReceiveUdpCall() // infinite waiting & receiving
+	transfile.StayLive()
 }
