@@ -20,34 +20,23 @@ func getPrefix(s string) string {
 	return "whatever"
 }
 
-func Test() {
-	filename := "dogg"
+func SplitFile(filename string, num int) {
 	file, err := os.Open(filename)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
+	checkError(err)
 	defer file.Close()
 	fileinfo, _ := file.Stat()
-	var filesize int64 = fileinfo.Size()
-	const part = 1 * (1 << 20) // 1 MB
-	totalpartnum := uint64(math.Ceil(float64(filesize) / float64(part)))
-	fmt.Println(totalpartnum)
-	fmt.Printf("splitting to %d pieces.\n", totalpartnum)
-
+	var filesize uint64 = uint64(fileinfo.Size())
+	fmt.Println("Filesize:", filesize)
+	totalpartnum := uint64(num)
+	part := uint64(math.Ceil(float64(filesize) / float64(totalpartnum)))
 	for i := uint64(1); i < totalpartnum+1; i++ {
-		partsize := int(math.Min(part, float64(filesize - int64((i-1)*part))))
-	fmt.Println(filesize)
-	fmt.Println(partsize)
+		partsize := int(math.Min(float64(part), float64(filesize - (i-1)*part)))
 		buf := make([]byte, partsize)
 		file.Read(buf)
 		partname := "doggy" + strconv.FormatUint(i, 10)
 		_, err := os.Create(partname)
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
+		checkError(err)
 		ioutil.WriteFile(partname, buf, os.ModeAppend)
-		fmt.Println("split to : ", partname)
+		fmt.Println("split to :", partname, ":", partsize)
 	}
 }
