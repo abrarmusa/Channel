@@ -11,7 +11,7 @@ package main
 
     [node ip:port] : this node's ip/port combo
     [starter-node ip:port] : the entry point node's ip/port combo
-    [-r=replicationFactor] : replication factor for keys, default r = 2
+    [-r=replicationFactor] : replication factor for Keys, default r = 2
     [-t] : trace mode for debugging
 
   Copy/paste for quick testing:
@@ -29,7 +29,10 @@ import (
   "os"
   "time"
   "sync"
-  "transfile"
+  "math"
+ // "strconv"
+  "math/big"
+  //"transfile"
 )
 
 // =======================================================================
@@ -43,10 +46,22 @@ type NodeMessage struct {
 type ConnResponse struct {
   Conn *net.TCPConn
 }
+type CommandMessage struct {
+  Cmd string
+  SourceAddr string
+  DestAddr string
+  Key string
+  Val string
+}
 
 // Some static command line options.
 var traceMode bool
 var replicationFactor int
+var store map[string]string
+var ftab map[int64]string
+var successor int64
+var identifier int64
+var m float64
 
 // The finger table.
 // Reading? Wrap RLock/RUnlock: lock.RLock(), lock.fingerTable[..], lock.RUnlock()
@@ -83,7 +98,7 @@ func (this *nodeRPCService) GetFingerTableEntry(id string,
   lock.RLock()
   defer lock.RUnlock()
 
-  // Send the value of the entry that some guy requested.
+  // Send the Value of the entry that some guy requested.
   reply.Msg = lock.fingerTable[id]
   return nil
 }
@@ -104,7 +119,7 @@ func (this *nodeRPCService) DeleteFingerTableEntry(id string,
   return nil
 }
 
-/* Checks error value and prints/exits if non nil.
+/* Checks error Value and prints/exits if non nil.
  */
 func checkError(err error) {
   if err != nil {
@@ -113,10 +128,10 @@ func checkError(err error) {
   }
 }
 
-/* Returns the SHA1 hash value as a string, of a key k.
+/* Returns the SHA1 hash Value as a string, of a Key k.
  */
-func computeSHA1Hash(key string) string {
-  buf := []byte(key)
+func computeSHA1Hash(Key string) string {
+  buf := []byte(Key)
   h := sha1.New()
   h.Write(buf)
   str := hex.EncodeToString(h.Sum(nil))
@@ -125,7 +140,7 @@ func computeSHA1Hash(key string) string {
 
 /* Computes the distance between two SHA1 hashes.
  */
-func computeDistBetweenTwoHashes(key1 string, key2 string) int64 {
+func computeDistBetweenTwoHashes(Key1 string, Key2 string) int64 {
   // todo
   return 69
 }
@@ -148,28 +163,56 @@ func sendAliveMessage(conn *net.TCPConn, id string) {
 
 /* Perform recursive search through finger tables to place me at the right spot.
  */
-func locateSuccessor(conn *net.TCPConn, id string) *net.TCPConn {
+func locateSuccessor(conn *net.TCPConn, id string) {
   // recursive search through finger tables
-  // use computeDistBetweenTwoHashes(key1 string, key2 string)
+  // use computeDistBetweenTwoHashes(Key1 string, Key2 string)
+  fmt.Println("Locating successor...")
 
-  // Send a special message of value "where", so that node knows it wants to find its place in the identifier circle.
-  msg := NodeMessage{"where"}
+  // Send a special message of Value "where", so that node knows it wants to find its place in the identifier circle.
+  msg := CommandMessage{"_discover", id, "", "", ""}
   msgInJSON, err := json.Marshal(msg)
   checkError(err)
+  fmt.Println("JSON: ", string(msgInJSON))
   buf := []byte(msgInJSON)
   // The listening function should have an interface{} to deal with a "where" message.
   // Handle this write in the listenForControlMessages function
   _, err = conn.Write(buf)
+  fmt.Println("Sent command: ", string(buf[:]))
   checkError(err)
 
   // The response should hold the conn of the successor.
-  n, err := conn.Read(buf)
-  checkError(err)
-  var successor ConnResponse
-  err = json.Unmarshal(buf[:n], &successor)
-  checkError(err)
+  // n, err := conn.Read(buf)
+  // checkError(err)
+  // var successor ConnResponse
+  // err = json.Unmarshal(buf[:n], &successor)
+  // checkError(err)
 
-  return successor.Conn
+  // return successor.Conn
+}
+
+func getIdentifier(Key string) int64 {
+  id := computeSHA1Hash(Key)
+  k := big.NewInt(0)
+  if _, ok := k.SetString(id, 16); ok {
+    fmt.Println("Number: ", k)
+  } else {
+    fmt.Println("Unable to parse into big int")
+  }
+  //k, err := strconv.ParseInt(id, 16, 64)
+  //checkError(err)
+  power := int64(math.Pow(2, m))
+  ret := (k.Mod(k, big.NewInt(power))).Int64()
+  fmt.Println("Identifier is: ", ret)
+  return ret
+}
+
+func getVal(Key string) (string, bool) {
+  v := ftab[getIdentifier(Key)]
+  if v == "" {
+    return v, false
+  } else {
+    return v, true
+  }
 }
 
 /* Handle messages from .
@@ -178,17 +221,139 @@ func listenForControlMessages(nodeAddr string) {
   // Todo
 }
 
+func sendToNextBestNode(msg CommandMessage) {
+  KeyIdentifier := getIdentifier(msg.Key)
+  // find node in finger table which is closest to requested Key
+  var closestNode string
+  minDistanceSoFar := math.Pow(2.0, float64(m))
+  for nodeIden, nodeAddr := range ftab {
+    if nodeIden - KeyIdentifier < int64(minDistanceSoFar) {
+      minDistanceSoFar = float64(nodeIden - KeyIdentifier)
+      closestNode = nodeAddr
+    }
+  }
+  // send message to closestNode
+  jsonMsg, err := json.Marshal(msg)
+  checkError(err)
+  buf := []byte(jsonMsg)
+  fmt.Println("Dialing to next best node...")
+  conn, _ := net.Dial("tcp", closestNode)
+  _, err = conn.Write(buf)
+  checkError(err)
+  
+}
+
+func sendMessage(addr string, msg []byte) {
+  //tcpAddr, err := net.ResolveTCPAddr("tcp", addr)
+  //checkError(err)
+  fmt.Println("Dialing to send message...")
+  fmt.Println("Address to dial: ", addr)
+  fmt.Println("Sending Message: ", string(msg))
+  conn, err := net.Dial("tcp", addr)
+  checkError(err)
+  _, err = conn.Write(msg)
+  checkError(err)
+}
+
 /* Only called when there are no nodes yet that are started up. This node becomes the first node.
  */
 func startUpSystem(nodeAddr string) {
-  // Todo
+  // listen and conect to node
+  fmt.Println("First node in system. Listening for incoming connections...")
+
+  ln, _ := net.Listen("tcp", nodeAddr)
+  conn, _ := ln.Accept()
+  fmt.Println("Accepting connection...")
+
+  var msg CommandMessage
+  //jsonMsg, err := json.Marshal(msg)
+  //checkError(err)
+  buf := make([]byte, 2048)
+
+  for {
+    n, err := conn.Read(buf)
+    fmt.Println("Received Command: ", string(buf[:n]))
+    checkError(err)
+    err = json.Unmarshal(buf[:n], &msg)
+    fmt.Println("Cmd: ", msg.Cmd)
+
+    switch msg.Cmd {
+      case "_getVal":
+        v, haveKey := getVal(msg.Key)
+        if haveKey {
+          // respond with Value
+          responseMsg := CommandMessage{"_resVal", nodeAddr, msg.SourceAddr, msg.Key, v}
+          resp, err := json.Marshal(responseMsg)
+          checkError(err)
+          buf = []byte(resp)
+          // connect to source of request and send Value
+          sendMessage(msg.SourceAddr, buf)
+        } else {
+          // send to next best node
+          sendToNextBestNode(msg)
+        }
+      case "_setVal":
+        _, haveKey := getVal(msg.Key)
+        if haveKey {
+          // change Value
+          store[msg.Key] = msg.Val
+          responseMsg := CommandMessage{"_resGen", nodeAddr, msg.SourceAddr, "", "Key Updated"}
+          resp, err := json.Marshal(responseMsg)
+          checkError(err)
+          buf = []byte(resp)
+          // connect to source of request and send Value
+          sendMessage(msg.SourceAddr, buf)
+        } else {
+          // send to next best node
+          sendToNextBestNode(msg)
+        }
+      case "_resDisc" :
+        successor = getIdentifier(msg.Val)
+        fmt.Println("Successor updated to address: ", msg.Val)
+        fmt.Println("Successor Identifier is: ", successor)
+      case "_discover":
+        nodeIdentifier := getIdentifier(msg.SourceAddr)
+        if successor == -1 {
+          ftab[nodeIdentifier] = msg.SourceAddr
+          
+          // notify new node of its successor (current successor)
+          responseMsg := CommandMessage {"_resDisc", nodeAddr, msg.SourceAddr, "", nodeAddr}
+          resMsg, err := json.Marshal(responseMsg)
+          checkError(err)
+          buf := []byte(resMsg)
+          //fmt.Println("HERE 0")
+          sendMessage(msg.SourceAddr, buf)
+          //fmt.Println("HERE 1")
+          // update successor to new node
+          successor = nodeIdentifier
+          break
+        }
+        if nodeIdentifier >= identifier && nodeIdentifier <= successor {
+          // incoming node belongs between this node and its current successor
+          // update finger table
+          ftab[nodeIdentifier] = msg.SourceAddr
+          // notify new node of its successor (current successor)
+          responseMsg := CommandMessage {"_resDisc", nodeAddr, msg.SourceAddr, "", string(successor)}
+          resMsg, err := json.Marshal(responseMsg)
+          checkError(err)
+          buf := []byte(resMsg)
+          sendMessage(msg.SourceAddr, buf)
+          // update successor to new node
+          successor = nodeIdentifier
+        } else {
+          // forward command to next best node
+          sendToNextBestNode(msg)
+        }
+    }
+  }
 }
 
 /* Attempt to join the system given the ip:port of a running node.
  */
 func connectToSystem(nodeAddr string, startAddr string) {
   // Get this node's IP hash, which will be used as its ID.
-  id := computeSHA1Hash(nodeAddr)
+  //id := computeSHA1Hash(nodeAddr)
+  fmt.Println("Connecting to peer system...")
 
   nodeTCPAddr, err := net.ResolveTCPAddr("tcp", nodeAddr)
   checkError(err)
@@ -197,19 +362,19 @@ func connectToSystem(nodeAddr string, startAddr string) {
 
   // Figure out where I am in the identifier circle.
   conn, err := net.DialTCP("tcp", nodeTCPAddr, startTCPAddr)
-  successorConn := locateSuccessor(conn, id)
-
+  //successorConn := locateSuccessor(conn, nodeAddr)
+  locateSuccessor(conn, nodeAddr)
   // Don't need this conn object anymore.
-  if successorConn != conn {
-    defer conn.Close()
-  }
+  // if successorConn != conn {
+  //   defer conn.Close()
+  // }
 
   // Send a heartbeat every 5 secs. The successor will start tracking this
   // node if it hadn't sent an alive message before.
-  go sendAliveMessage(successorConn, id)
+  //go sendAliveMessage(successorConn, nodeAddr)
 
   // Listen for TCP message requests to this node.
-  listenForControlMessages(nodeAddr)
+  //listenForControlMessages(nodeAddr)
 }
 
 /* The main function.
@@ -226,29 +391,41 @@ func main() {
     flag.BoolVar(&traceMode, "t", false, "trace mode")
     flag.Parse()
 
+    store = make(map[string]string)
+    ftab = make(map[int64]string)
+    m = 7
+    successor = -1
+
     // Set both args as equal on the command line if no node is operational yet.
     // Need to start up a source node (this) first.
+    // if (nodeAddr == startAddr) {
+    //   startUpSystem(nodeAddr)
+    // // Else join an existing identifier circle, given the address of a node that is running.
+    // } else {
+    //   connectToSystem(nodeAddr, startAddr)
+    // }
     if (nodeAddr == startAddr) {
       startUpSystem(nodeAddr)
-    // Else join an existing identifier circle, given the address of a node that is running.
     } else {
+      go startUpSystem(nodeAddr)
       connectToSystem(nodeAddr, startAddr)
     }
   }
+  for {}
 
   // Setup UDP server
-  u := transfile.UdpInfo{
-    Conn: nil,
-    Port: ":0",
-  }
-  u.SetupUdp()
-  fmt.Println("This UDP:", u)
+ //  u := transfile.UdpInfo{
+ //    Conn: nil,
+ //    Port: ":0",
+ //  }
+ //  u.SetupUdp()
+ //  fmt.Println("This UDP:", u)
 
-  /*
-  (1) New u.Port is to be advertised as part of finger
-  (2) Send data like this: u.SendUdpCall("198.162.33.54:40465")
-  */
+  
+ //  (1) New u.Port is to be advertised as part of finger
+ //  (2) Send data like this: u.SendUdpCall("198.162.33.54:40465")
+  
 
-	go u.ReceiveUdpCall() // infinite waiting & receiving
-	transfile.StayLive()
+	// go u.ReceiveUdpCall() // infinite waiting & receiving
+	// transfile.StayLive()
 }
