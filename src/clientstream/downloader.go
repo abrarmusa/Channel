@@ -117,7 +117,7 @@ func (service *Service) localFileAvailability(filename string, response *Respons
 // file is available, it continues on to see if the segment is available. If the segment is available, it returns a response with the VidSegment.
 // In case of unavailability, it will either return an error saying "File Unavailable." or "Segment unavailable." depending on what was unavailable.
 // The method locks the local filesystem for all Reads and Writes during the process.
-func (service *Service) sendFileSegment(filename string, segment *VidSegment) error {
+func (service *Service) getFileSegment(filename string, segment *VidSegment) error {
 	var seg VidSegment
 	fileSysLock.RLock()
 	video, ok := localFileSys.Files["filename"]
