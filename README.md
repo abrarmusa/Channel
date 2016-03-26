@@ -1,7 +1,7 @@
 # README.md
 
 ### Repository details
-`/proposal`: holds the proposal pdf and latex files \
+`/proposal`: holds the proposal pdf and latex files <br>
 `/src`: contains Go source files
 
 ### Important dates
