@@ -61,9 +61,11 @@ var store map[string]string
 var ftab map[int64]string
 var successor int64
 var successorAddr string
+var predecessorAddr string
 var identifier int64
 var m float64
 var c chan string
+var myAddr string
 
 // The finger table.
 // Reading? Wrap RLock/RUnlock: lock.RLock(), lock.fingerTable[..], lock.RUnlock()
@@ -152,7 +154,12 @@ func computeDistBetweenTwoHashes(Key1 string, Key2 string) int64 {
 func sendAliveMessage(conn *net.UDPConn, id string) {
   for {
     // send this node's id as an alive message
-    msg := NodeMessage{id}
+      Cmd string
+  SourceAddr string
+  DestAddr string
+  Key string
+  Val string
+    msg := CommandMessage{"_heartbeat", myAddr, predecessorAddr, "status", "alive"}
     aliveMessage, err := json.Marshal(msg)
     checkError(err)
     b := []byte(aliveMessage)
@@ -161,6 +168,17 @@ func sendAliveMessage(conn *net.UDPConn, id string) {
 
     time.Sleep(5 * time.Second)
   }
+}
+
+func locatePredecessor(conn net.Conn) {
+  fmt.Println("Locating predecessor...")
+  msg := CommandMessage{"_locPred", myAddr, "", "", ""}
+  msgInJSON, err := json.Marshal(msg)
+  checkError(err)
+  buf := []byte(msgInJSON)
+  _, err = conn.Write(buf)
+  checkError(err)
+  fmt.Println("Sent command: ", string(buf[:]))
 }
 
 /* Perform recursive search through finger tables to place me at the right spot.
@@ -409,6 +427,10 @@ func startUpSystem(nodeAddr string) {
           // send to next best node
           sendToNextBestNode(k,msg)
         }
+      case "_locPred" :
+        // TODO
+      case "_resLocPred":
+        // TODO
       case "_resDisc" :
         successor = getIdentifier(msg.Val)
         successorAddr = msg.Val
@@ -475,6 +497,7 @@ func connectToSystem(nodeAddr string, startAddr string) {
   defer conn.Close()
   //successorConn := locateSuccessor(conn, nodeAddr)
   locateSuccessor(conn, nodeAddr)
+  locatePredecessor(conn)
   <-c
   // initialize finger table
   initFingerTable(conn, nodeAddr)
@@ -499,7 +522,7 @@ func main() {
     fmt.Println("Usage: go run node.go [node ip:port] [starter-node ip:port] [-r=replicationFactor] [-t]")
     os.Exit(-1)
   } else {
-    nodeAddr := os.Args[1] // ip:port of this node
+    myAddr = os.Args[1] // ip:port of this node
     startAddr := os.Args[2] // ip:port of initial node
     flag.IntVar(&replicationFactor, "r", 2, "replication factor")
     flag.BoolVar(&traceMode, "t", false, "trace mode")
@@ -511,7 +534,7 @@ func main() {
     successor = -1
     successorAddr = ""
     c = make(chan string)
-    identifier = getIdentifier(nodeAddr)
+    identifier = getIdentifier(myAddr)
 
     fmt.Println("THIS NODE'S IDENTIFIER IS: ", identifier)
 
