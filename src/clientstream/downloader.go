@@ -28,10 +28,15 @@ import (
 // -------------------
 // DESCRIPTION:
 // -------------------
-// This struct holds a particular part of a video file. Id refers to the segment id and the body refers to the actual video bytes
+// This struct holds a particular part of a video file. Id refers to the segment id and the body refers to the bytecount of the actual video bytes
 type VidSegment struct {
 	Id   int
-	Body byte
+	Body []byte
+}
+
+type ReqStruct struct {
+	Filename  string
+	SegmentId int
 }
 
 // --> Video <---
@@ -105,6 +110,7 @@ type Service int
 
 var localFileSys FileSys
 var fileSysLock *sync.RWMutex
+var bytecount int = 2048
 
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -146,25 +152,32 @@ func (service *Service) LocalFileAvailability(filename string, response *Respons
 // file is available, it continues on to see if the segment is available. If the segment is available, it returns a response with the VidSegment.
 // In case of unavailability, it will either return an error saying "File Unavailable." or "Segment unavailable." depending on what was unavailable.
 // The method locks the local filesystem for all Reads and Writes during the process.
-func (service *Service) GetFileSegment(filename string, segment *VidSegment) error {
-	colorprint.Debug("INBOUND RPC REQUEST: Sending video segment for " + filename)
+func (service *Service) GetFileSegment(segReq *ReqStruct, segment *VidSegment) error {
+	colorprint.Debug("INBOUND RPC REQUEST: Sending video segment for " + segReq.Filename)
 	var seg VidSegment
 	fileSysLock.RLock()
-	video, ok := localFileSys.Files["filename"]
+	outputstr := ""
+	video, ok := localFileSys.Files[segReq.Filename]
 	if ok {
-		seg, ok = video.Segments[segment.Id]
+		outputstr += ("\nNode is asking for segment no. " + strconv.Itoa(segReq.SegmentId) + " for " + segReq.Filename)
+		_, ok := (video.Segments[1])
+		if ok {
+			outputstr += ("\nSeg 1 available")
+		}
+		seg, ok = video.Segments[segReq.SegmentId]
 		if ok {
 			segment.Body = seg.Body
 		} else {
-			fileSysLock.Unlock()
+			outputstr += ("\nSegment " + strconv.Itoa(segReq.SegmentId) + " unavailable for " + segReq.Filename)
 			return errors.New("Segment unavailable.")
+			fileSysLock.Unlock()
 		}
 	} else {
-		colorprint.Debug("INBOUND RPC REQUEST COMPLETED")
+
 		return errors.New("File unavailable.")
+		fileSysLock.Unlock()
 	}
-	colorprint.Debug("INBOUND RPC REQUEST COMPLETED")
-	fileSysLock.Unlock()
+	colorprint.Warning(outputstr)
 	return nil
 }
 
@@ -205,14 +218,15 @@ func checkFileAvailability(filename string, nodeadd string, nodeService *rpc.Cli
 // DESCRIPTION:
 // -------------------
 // This method calls an RPC method to another node to obtain a particular segment of a video
-func getVideoSegment(filename string, segId int, nodeService *rpc.Client) {
+func getVideoSegment(fname string, segId int, nodeService *rpc.Client) VidSegment {
+	segReq := &ReqStruct{
+		Filename:  fname,
+		SegmentId: segId,
+	}
 	var vidSeg VidSegment
-	vidSeg.Id = segId
-	err := nodeService.Call("nodeService.GetFileSegment", filename, &vidSeg)
+	err := nodeService.Call("Service.GetFileSegment", segReq, &vidSeg)
 	checkError(err)
-	// TODO
-	// TODO
-	// TODO
+	return vidSeg
 }
 
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -226,10 +240,28 @@ func getVideoSegment(filename string, segId int, nodeService *rpc.Client) {
 // DESCRIPTION:
 // -------------------
 // This method calls an RPC method to another node to obtain a particular segment of a video
-func saveSegToFileSys() {
-	// TODO
-	// TODO
-	// TODO
+func saveSegToFileSys(service *rpc.Client, segNums int64, fname string) {
+	var newVid Video
+	vidMap := make(map[int]VidSegment)
+	var segsAvail []int64
+	for i := 1; i <= int(segNums); i++ {
+		colorprint.Warning("Asking for segment " + strconv.Itoa(int(i)))
+		vidSeg := getVideoSegment(fname, i, service)
+		vidMap[i] = vidSeg
+		segsAvail = append(segsAvail, int64(i))
+	}
+	newVid = Video{
+		Name:      fname,
+		SegNums:   segNums,
+		SegsAvail: segsAvail,
+		Segments:  vidMap,
+	}
+	fileSysLock.Lock()
+	localFileSys.Files[fname] = newVid
+	fileSysLock.Unlock()
+	fmt.Println()
+	colorprint.Info(fname + " saved into file system.")
+	colorprint.Warning("Saving file info into local json list")
 }
 
 // processLocalVideosIntoFileSys()
@@ -256,15 +288,19 @@ func processLocalVideosIntoFileSys() {
 		dat, err := ioutil.ReadFile(value.Path)
 		checkError(err)
 		colorprint.Info("---------------------------------------------------------------------------")
-		colorprint.Info("Video:" + value.Name + " has " + strconv.Itoa(len(dat)) + " segments.")
+		colorprint.Info("Video:" + value.Name + " has " + strconv.Itoa(len(dat)/bytecount) + " segments.")
 		segsAvail, vidMap := convByteArrayToSeg(dat)
+
 		vid := Video{
 			Name:      value.Name,
-			SegNums:   int64(len(dat)),
+			SegNums:   int64(len(dat) / bytecount),
 			SegsAvail: segsAvail,
 			Segments:  vidMap,
 		}
+		printAvSegs(segsAvail)
+		fileSysLock.Lock()
 		localFileSys.Files[value.Name] = vid
+		fileSysLock.Unlock()
 		colorprint.Info("Completed Processing " + value.Name + " at " + value.Path)
 		colorprint.Info("---------------------------------------------------------------------------")
 	}
@@ -291,6 +327,20 @@ func checkError(err error) {
 	}
 }
 
+// printAvSegs(segsAvail []int64)
+// --------------------------------------------------------------------------------------------
+// DESCRIPTION:
+// -------------------
+// Prints list of ids for available segment nums
+func printAvSegs(segsAvail []int64) {
+	colorprint.Warning("Segments available")
+	for _, element := range segsAvail {
+		fmt.Printf("\rProcessing segment[%d]", element)
+	}
+	fmt.Println()
+	colorprint.Warning("XXXXXXXXXXXXXXXXX")
+}
+
 // validIP(ipAddress string, field string) bool
 // --------------------------------------------------------------------------------------------
 // DESCRIPTION:
@@ -311,22 +361,38 @@ func validIP(ipAddress string, field string) bool {
 // DESCRIPTION:
 // -------------------
 // Converts the byte array from a video files into Video Segments.
-
-// TODO: Set packet size to 8 byte packets - get 8 bytes per VidSegment
-// Get max payload size for vid stream packets
 func convByteArrayToSeg(bytes []byte) ([]int64, map[int]VidSegment) {
 	vidmap := make(map[int]VidSegment)
 	var segsAvail []int64
 	var vidSeg VidSegment
-	// counter := 0
+	var eightBSeg []byte
+	counter, counter2, counter3 := 1, 1, 1
+	progstr := "="
+	blen := len(bytes)
+	altc := (blen / 100)
 	for index, element := range bytes {
-		vidSeg = VidSegment{
-			Id:   (index + 1),
-			Body: element,
+		eightBSeg = append(eightBSeg, element)
+		if counter == bytecount {
+			counter = 0
+			vidSeg = VidSegment{
+				Id:   ((index % bytecount) + 1),
+				Body: eightBSeg,
+			}
+			vidmap[((index / bytecount) + 1)] = vidSeg
+			segsAvail = append(segsAvail, int64(((index / bytecount) + 1)))
+			eightBSeg = []byte{}
 		}
-		vidmap[index+1] = vidSeg
-		segsAvail = append(segsAvail, int64(index))
+		counter++
+		counter2++
+		counter3++
+		if counter2 == altc {
+			progstr += "="
+			fmt.Printf("\r[%s]  - %d%%", progstr, ((counter3*100)/blen + 1))
+			counter2 = 0
+		}
 	}
+	fmt.Println()
+	colorprint.Debug("SEGMENTS PROCESSED: " + strconv.Itoa((len(segsAvail))))
 	return segsAvail, vidmap
 }
 
@@ -363,13 +429,62 @@ func setUpRPC(nodeRPC string) {
 
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// IO METHODS
+// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+// instr(nodeRPC string, nodeUDP string)
+// --------------------------------------------------------------------------------------------
+// DESCRIPTION:
+// -------------------
+// This method responds to the user input requests
+func instr(nodeRPC string, nodeUDP string) {
+	var input string
+	var fname string
+	for i := 0; i >= 0; i++ {
+		colorprint.Info(">>>> Please type in the command")
+		fmt.Scan(&input)
+		cmd := input
+		if input == "get" {
+			getHelper(nodeRPC, nodeUDP, input, fname, cmd)
+		}
+	}
+}
+
+// getHelper(nodeRPC string, nodeUDP string)
+// --------------------------------------------------------------------------------------------
+// DESCRIPTION:
+// -------------------
+// This method responds to the user input request for "get"
+func getHelper(nodeRPC string, nodeUDP string, input string, fname string, cmd string) {
+
+	colorprint.Info(">>>> Please enter the name of the file that you would like to obtain")
+	fmt.Scan(&fname)
+	colorprint.Debug("<<<< " + fname)
+	colorprint.Info(">>>> Please enter the address of the node you want to connect to")
+	fmt.Scan(&input)
+	colorprint.Debug("<<<< " + input)
+	nodeAddr := input
+	service, err := rpc.Dial("tcp", nodeAddr) // Connect to Service via RPC // returns *Client, err
+	checkError(err)
+	avail, segNums, _ := checkFileAvailability(fname, nodeAddr, service)
+	if avail && (cmd == "get") {
+		colorprint.Info(">>>> Would you like to get the file from the node[" + nodeRPC + "]?(y/n)")
+		fmt.Scan(&input)
+		colorprint.Debug("<<<< " + input)
+		if input == "y" {
+			saveSegToFileSys(service, segNums, fname)
+		}
+	}
+}
+
+// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // MAIN METHODS
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 func main() {
-	var input string
-	var fname string
 	// ========================================
 	fileSysLock = &sync.RWMutex{}
 	processLocalVideosIntoFileSys()
@@ -382,35 +497,7 @@ func main() {
 		}
 
 		go setUpRPC(nodeRPC)
-		for i := 0; i >= 0; i++ {
-			colorprint.Info(">>>> Please type in the command")
-			fmt.Scan(&input)
-			cmd := input
-			if input == "get" {
-				colorprint.Info(">>>> Please enter the name of the file that you would like to obtain")
-				fmt.Scan(&fname)
-				colorprint.Debug("<<<< " + fname)
-				colorprint.Info(">>>> Please enter the address of the node you want to connect to")
-				fmt.Scan(&input)
-				colorprint.Debug("<<<< " + input)
-				nodeAddr := input
-
-				service, err := rpc.Dial("tcp", nodeAddr) // Connect to Service via RPC // returns *Client, err
-				checkError(err)
-				avail, segNums, _ := checkFileAvailability(fname, nodeAddr, service)
-				if avail && (cmd == "get") {
-					colorprint.Info(">>>> Would you like to get the file from the node[" + nodeRPC + "]?(y/n)")
-					fmt.Scan(&input)
-					colorprint.Debug("<<<< " + input)
-					if input == "y" {
-						for i := 1; i <= int(segNums); i++ {
-							getVideoSegment(fname, i, service)
-						}
-					}
-				}
-
-			}
-		}
+		instr(nodeRPC, nodeUDP)
 
 	}
 }
