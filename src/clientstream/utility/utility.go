@@ -3,7 +3,10 @@ package utility
 // package clientstream
 
 import (
-	"sync"
+	"../colorprint"
+	"fmt"
+	"github.com/fatih/color"
+	"os"
 )
 
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -83,19 +86,36 @@ type Response struct {
 	SegsAvail []int64
 }
 
-// --> Service <---
-// ----------------
+// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// HELPER METHODS
+// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+// CheckError(err error)
+// --------------------------------------------------------------------------------------------
 // DESCRIPTION:
 // -------------------
-// This type just holds an integer to use for registering the RPC Service
-type Service int
+// Prints error message into console in red
+func CheckError(err error) {
+	if err != nil {
+		color.Set(color.FgRed)
+		fmt.Println(err)
+		color.Unset()
+		os.Exit(-1)
+	}
+}
 
-// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-// GLOBAL VARS
-// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-
-var localFileSys FileSys
-var fileSysLock *sync.RWMutex
-var bytecount int = 2048
+// printAvSegs(segsAvail []int64)
+// --------------------------------------------------------------------------------------------
+// DESCRIPTION:
+// -------------------
+// Prints list of ids for available segment nums
+func PrintAvSegs(segsAvail []int64) {
+	colorprint.Warning("Segments available")
+	for _, element := range segsAvail {
+		fmt.Printf("\rProcessing segment[%d]", element)
+	}
+	fmt.Println()
+	colorprint.Warning("XXXXXXXXXXXXXXXXX")
+}
