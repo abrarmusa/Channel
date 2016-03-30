@@ -13,9 +13,9 @@ import (
 	"net"
 	"net/rpc"
 	"os"
-	"regexp"
 	"strconv"
 	"sync"
+	"time"
 )
 
 // --> Service <---
@@ -32,7 +32,8 @@ type Service int
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 var localFileSys utility.FileSys
 var fileSysLock *sync.RWMutex
-var bytecount int = 2048
+var bytecount int = 1024
+var filePaths utility.FilePath
 
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -40,7 +41,7 @@ var bytecount int = 2048
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-// (service *Service) localutility.FileAvailability(filename string, response *utilty.Response) error
+// (service *Service) localFileAvailability(filename string, response *utilty.Response) error
 // -----------------------------------------------------------------------------------
 // DESCRIPTION:
 // -------------------
@@ -166,11 +167,36 @@ func saveSegsToFileSys(service *rpc.Client, segNums int64, fname string) {
 	var newVid utility.Video
 	vidMap := make(map[int]utility.VidSegment)
 	var segsAvail []int64
-	for i := 1; i <= int(segNums); i++ {
-		colorprint.Warning("Asking for segment " + strconv.Itoa(int(i)))
-		vidSeg := getVideoSegment(fname, i, service)
-		vidMap[i] = vidSeg
-		segsAvail = append(segsAvail, int64(i))
+	progstr := "="
+	counter2, counter3, altc, downloadstr := 1, 1, (segNums / 100), 0
+	quit := make(chan int)
+	go func() {
+		for i := 1; i <= int(segNums); i++ {
+			vidMap[i] = getVideoSegment(fname, i, service)
+			segsAvail = append(segsAvail, int64(i))
+			counter2++
+			counter3++
+			downloadstr++
+			if counter2 == int(altc) {
+				progstr += "="
+				counter2 = 0
+			}
+			if i == int(segNums) {
+				quit <- 1
+			}
+		}
+	}()
+forTimer:
+	for range time.Tick(1 * time.Second) {
+		progress := ((counter3 * 100) / int(segNums))
+		fmt.Printf("\rDownload Speed: %.1f MB/s [%s]  - %d%%", float64(downloadstr)/float64(bytecount), progstr, progress)
+		downloadstr = 0
+		select {
+		case <-quit:
+			break forTimer
+		default:
+			continue
+		}
 	}
 	newVid = utility.Video{
 		Name:      fname,
@@ -185,6 +211,39 @@ func saveSegsToFileSys(service *rpc.Client, segNums int64, fname string) {
 	colorprint.Info(fname + " saved into file system.")
 	colorprint.Warning("Saving file info into local json list")
 
+	fileSysLock.RLock()
+	vid := localFileSys.Files[fname]
+	fileSysLock.RUnlock()
+	pathname := writeToFileHelper(fname, vid)
+	newFile := utility.File{
+		Name: fname,
+		Path: pathname,
+	}
+	filePaths.Files = append(filePaths.Files, newFile)
+	jsondata, err := json.Marshal(filePaths)
+	utility.CheckError(err)
+	utility.SaveFileInfoToJson(jsondata)
+
+}
+
+// writeToFileHelper()
+// --------------------------------------------------------------------------------------------
+// DESCRIPTION:
+// -------------------
+// This method writes the downloaded file into a file of its own in the filesys/downloaded folder
+func writeToFileHelper(fname string, video utility.Video) string {
+	var data []byte
+	for i := 1; i < int(video.SegNums); i++ {
+		for j := 0; j < len(video.Segments[i].Body); j++ {
+			data = append(data, video.Segments[i].Body[j])
+		}
+	}
+	str := "./filesys/downloaded/"
+	str += fname
+	err := ioutil.WriteFile(str, data, 0777)
+	utility.CheckError(err)
+	return str
+
 }
 
 // processLocalVideosIntoFileSys()
@@ -197,7 +256,7 @@ func processLocalVideosIntoFileSys() {
 	locFiles, err := ioutil.ReadFile("./filesys/localFiles.json")
 	utility.CheckError(err)
 	files := make([]utility.File, 0)
-	var filePaths utility.FilePath
+
 	filePaths.Files = files
 	err = json.Unmarshal(locFiles, &filePaths)
 	utility.CheckError(err)
@@ -228,21 +287,6 @@ func processLocalVideosIntoFileSys() {
 		colorprint.Info("---------------------------------------------------------------------------")
 	}
 
-}
-
-// validIP(ipAddress string, field string) bool
-// --------------------------------------------------------------------------------------------
-// DESCRIPTION:
-// -------------------
-// Checks if the ip provided is valid. Accepts only the port as well eg. :3000 although in this case
-// it assumes the localhost ip address
-func validIP(ipAddress string, field string) bool {
-	re, _ := regexp.Compile(`[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\:[0-9]{1,5}|\:[0-9]{1,5}`)
-	if re.MatchString(ipAddress) {
-		return true
-	}
-	fmt.Println("\x1b[31;1mError: "+field+":"+ipAddress, "is not in the correct format\x1b[0m")
-	return false
 }
 
 // convByteArrayToSeg(bytes []byte) ([]int64, map[int]utility.VidSegment)
@@ -381,7 +425,7 @@ func main() {
 	if len(os.Args) == 3 {
 		nodeRPC := os.Args[1]
 		nodeUDP := os.Args[2]
-		if !validIP(nodeRPC, "[node RPC ip:port]") || !validIP(nodeUDP, "[node UDP ip:port]") {
+		if !utility.ValidIP(nodeRPC, "[node RPC ip:port]") || !utility.ValidIP(nodeUDP, "[node UDP ip:port]") {
 			os.Exit(-1)
 		}
 

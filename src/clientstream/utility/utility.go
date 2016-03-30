@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/fatih/color"
 	"os"
+	"regexp"
 )
 
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -118,4 +119,31 @@ func PrintAvSegs(segsAvail []int64) {
 	}
 	fmt.Println()
 	colorprint.Warning("XXXXXXXXXXXXXXXXX")
+}
+
+// SaveFileInfoToJson()
+// --------------------------------------------------------------------------------------------
+// DESCRIPTION:
+// -------------------
+// This method saves file information into a json file in the filesys folder
+func SaveFileInfoToJson(jsondata []byte) {
+	jsonFile, err := os.Create("./filesys/localFiles.json")
+	CheckError(err)
+	jsonFile.Write(jsondata)
+	jsonFile.Close()
+}
+
+// validIP(ipAddress string, field string) bool
+// --------------------------------------------------------------------------------------------
+// DESCRIPTION:
+// -------------------
+// Checks if the ip provided is valid. Accepts only the port as well eg. :3000 although in this case
+// it assumes the localhost ip address
+func ValidIP(ipAddress string, field string) bool {
+	re, _ := regexp.Compile(`[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\:[0-9]{1,5}|\:[0-9]{1,5}`)
+	if re.MatchString(ipAddress) {
+		return true
+	}
+	fmt.Println("\x1b[31;1mError: "+field+":"+ipAddress, "is not in the correct format\x1b[0m")
+	return false
 }
