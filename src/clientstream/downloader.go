@@ -208,9 +208,8 @@ forTimer:
 	localFileSys.Files[fname] = newVid
 	fileSysLock.Unlock()
 	fmt.Println()
-	colorprint.Info(fname + " saved into file system.")
-	colorprint.Warning("Saving file info into local json list")
 
+	colorprint.Warning("Saving file info into filesystem table")
 	fileSysLock.RLock()
 	vid := localFileSys.Files[fname]
 	fileSysLock.RUnlock()
@@ -223,6 +222,7 @@ forTimer:
 	jsondata, err := json.Marshal(filePaths)
 	utility.CheckError(err)
 	utility.SaveFileInfoToJson(jsondata)
+	colorprint.Info(fname + " saved into file system. File is located at " + pathname + ".")
 
 }
 
@@ -380,6 +380,8 @@ func instr(nodeRPC string, nodeUDP string) {
 		cmd := input
 		if input == "get" {
 			getHelper(nodeRPC, nodeUDP, input, fname, cmd)
+		} else if input == "list" {
+			utility.PrintFileSysTable()
 		}
 	}
 }
@@ -428,7 +430,6 @@ func main() {
 		if !utility.ValidIP(nodeRPC, "[node RPC ip:port]") || !utility.ValidIP(nodeUDP, "[node UDP ip:port]") {
 			os.Exit(-1)
 		}
-
 		go setUpRPC(nodeRPC)
 		instr(nodeRPC, nodeUDP)
 
