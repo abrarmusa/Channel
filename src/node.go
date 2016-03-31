@@ -1,5 +1,4 @@
 package main
-
 /*
   UBC CS416 Distributed Systems Project Source Code
 
@@ -7,17 +6,14 @@ package main
   @date: Mar. 1 2016 - Apr. 11 2016.
 
   Usage:
-    go run node.go [node ip:port] [starter-node ip:port] [m size] [-r=replicationFactor] [-t]"
+    go run node.go [node ip:port] [starter-node ip:port]"
 
     [node ip:port] : this node's ip/port combo
     [starter-node ip:port] : the entry point node's ip/port combo
-    [m size] : 2^m circle size of the system
-    [-r=replicationFactor] : replication factor for Keys, default r = 2
-    [-t] : trace mode for debugging
 
   Copy/paste for quick testing:
-    "go run node.go :0 :6666 7" <-- trace off, default replication factor (2)
-    "go run node.go :0 :6666 7 -t -r=5" <-- trace on, r = 5
+    "go run node.go :6666 :6666" <- start up system at :6666
+    "go run node.go :0 :6666" <- connect to node listening at :6666
 */
 
 import (
@@ -29,6 +25,7 @@ import (
 	"math"
 	"math/big"
 	"net"
+  "net/rpc"
 	"os"
 	"strconv"
 	"sync"
@@ -36,7 +33,7 @@ import (
 )
 
 // =======================================================================
-// ====================== Global variables/types =========================
+// ====================== Global Variables/Types =========================
 // =======================================================================
 // Some types used for RPC communication.
 type nodeRPCService int
@@ -49,12 +46,8 @@ type CommandMessage struct {
 }
 
 // Some static command line options.
-var KRED string = "\x1B[35m"
-var traceMode bool
 var replicationFactor int
 var m float64
-var store map[string]string
-var ftab map[int64]string
 var successor int64
 var successorAddr string
 var identifier int64
@@ -72,7 +65,26 @@ var fileLocker = struct {
 }{fileTable: make(map[string]string)}
 
 // =======================================================================
-// ======================= Function definitions ==========================
+// ======================= RPC Methods ===================================
+// =======================================================================
+/* Updates a finger table entry at this node. Called by other nodes.
+ */
+func (this *nodeRPCService) UpdateFingerTableEntry(id string, addr string,
+  reply *CommandMessage) error {
+  // Lock 'em up.
+  fingerLocker.Lock()
+  defer fingerLocker.Unlock()
+
+  // Update.
+  fingerLocker.fingerTable[id] = addr
+
+  // Let the other guy know it went well.
+  reply.Val = "Ok"
+  return nil
+}
+
+// =======================================================================
+// ======================= Helper Methods ================================
 // =======================================================================
 /* Checks error Value and prints/exits if non nil.
  */
@@ -93,12 +105,15 @@ func computeSHA1Hash(Key string) string {
 	return str
 }
 
+// =======================================================================
+// =================== Maintenance Methods ===============================
+// =======================================================================
 /* Send periodic heartbeats to let predecessor know this node is still alive.
  */
-func sendAliveMessage(conn *net.UDPConn, addr string) {
+func sendAliveMessage(conn *net.UDPConn, src string, dest string) {
 	for {
 		// send this node's id as an alive message
-		msg := CommandMessage{"_keepalive", addr, "", "", ""}
+		msg := CommandMessage{"alive", src, dest, "", ""}
 		aliveMessage, err := json.Marshal(msg)
 		checkError(err)
 		b := []byte(aliveMessage)
@@ -109,6 +124,9 @@ func sendAliveMessage(conn *net.UDPConn, addr string) {
 	}
 }
 
+// =======================================================================
+// ======================= Logical Methods ===============================
+// =======================================================================
 /* Perform recursive search through finger tables to place me at the right spot.
  */
 func locateSuccessor(conn *net.UDPConn, addr string) {
@@ -319,24 +337,21 @@ func connectToSystem(nodeAddr string, startAddr string) {
  */
 func main() {
 	// Handle the command line.
-	if len(os.Args) > 6 || len(os.Args) < 4 {
+	if len(os.Args) > 4 || len(os.Args) < 2 {
 		fmt.Println("Usage: go run node.go [node ip:port] [starter-node ip:port] [m size] [-r=replicationFactor] [-t]")
 		os.Exit(-1)
 	} else {
 		nodeAddr := os.Args[1]                    // ip:port of this node
 		startAddr := os.Args[2]                   // ip:port of initial node
-		m, _ = strconv.ParseFloat(os.Args[3], 64) // 2^m id circle size
-		flag.IntVar(&replicationFactor, "r", 2, "replication factor")
-		flag.BoolVar(&traceMode, "t", false, "trace mode")
-		flag.Parse()
-
+    replicationFactor = 2 // # replications
+    m = 3 // size of identifier circle
 		successor = -1
 
 		if nodeAddr == startAddr {
-			fmt.Println(KRED, "## Booting up system at addr ", nodeAddr)
+			fmt.Println("## Booting up system at addr ", nodeAddr)
 			listenForUDPMsgs(nodeAddr)
 		} else {
-			fmt.Println(KRED, "## Attempting to connect to node at ", startAddr)
+			fmt.Println("## Attempting to connect to node at ", startAddr)
 			connectToSystem(nodeAddr, startAddr)
 			listenForUDPMsgs(nodeAddr)
 		}
