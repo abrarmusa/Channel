@@ -3,8 +3,10 @@ package main
 // package clientstream
 
 import (
-	"./colorprint"
-	"./utility"
+	"../colorprint"
+	"../consts"
+	"../ui"
+	"../utility"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -32,7 +34,6 @@ type Service int
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 var localFileSys utility.FileSys
 var fileSysLock *sync.RWMutex
-var bytecount int = 1024
 var filePaths utility.FilePath
 
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -76,17 +77,17 @@ func (service *Service) LocalFileAvailability(filename string, response *utility
 // In case of unavailability, it will either return an error saying "utility.File Unavailable." or "Segment unavailable." depending on what was unavailable.
 // The method locks the local filesystem for all Reads and Writes during the process.
 func (service *Service) GetFileSegment(segReq *utility.ReqStruct, segment *utility.VidSegment) error {
+	t := time.Now().String()
+	colorprint.Debug("------------------------------------------------------------------")
+	colorprint.Debug(">> " + t + "  <<")
 	colorprint.Debug("INBOUND RPC REQUEST: Sending video segment for " + segReq.Filename)
 	var seg utility.VidSegment
 	fileSysLock.RLock()
 	outputstr := ""
 	video, ok := localFileSys.Files[segReq.Filename]
 	if ok {
-		outputstr += ("\nNode is asking for segment no. " + strconv.Itoa(segReq.SegmentId) + " for " + segReq.Filename)
+		outputstr += ("Node is asking for segment no. " + strconv.Itoa(segReq.SegmentId) + " for " + segReq.Filename)
 		_, ok := (video.Segments[1])
-		if ok {
-			outputstr += ("\nSeg 1 available")
-		}
 		seg, ok = video.Segments[segReq.SegmentId]
 		if ok {
 			segment.Body = seg.Body
@@ -168,7 +169,7 @@ func saveSegsToFileSys(service *rpc.Client, segNums int64, fname string) {
 	vidMap := make(map[int]utility.VidSegment)
 	var segsAvail []int64
 	progstr := "="
-	counter2, counter3, altc, downloadstr := 1, 1, (segNums / 100), 0
+	counter2, counter3, altc, downloadstr := 1, 1, (segNums / consts.Factor), 0
 	quit := make(chan int)
 	go func() {
 		for i := 1; i <= int(segNums); i++ {
@@ -189,7 +190,7 @@ func saveSegsToFileSys(service *rpc.Client, segNums int64, fname string) {
 forTimer:
 	for range time.Tick(1 * time.Second) {
 		progress := ((counter3 * 100) / int(segNums))
-		fmt.Printf("\rDownload Speed: %.1f MB/s [%s]  - %d%%", float64(downloadstr)/float64(bytecount), progstr, progress)
+		fmt.Printf("\rDownload Speed: %.1f MB/s [%s]  - %d%%", float64(downloadstr)/float64(consts.Bytecount), progstr, progress)
 		downloadstr = 0
 		select {
 		case <-quit:
@@ -221,7 +222,7 @@ forTimer:
 	filePaths.Files = append(filePaths.Files, newFile)
 	jsondata, err := json.Marshal(filePaths)
 	utility.CheckError(err)
-	utility.SaveFileInfoToJson(jsondata)
+	utility.SaveFileInfoToJson(jsondata, consts.DirPath)
 	colorprint.Info(fname + " saved into file system. File is located at " + pathname + ".")
 
 }
@@ -238,7 +239,7 @@ func writeToFileHelper(fname string, video utility.Video) string {
 			data = append(data, video.Segments[i].Body[j])
 		}
 	}
-	str := "./filesys/downloaded/"
+	str := consts.DirPath + "/downloaded/"
 	str += fname
 	err := ioutil.WriteFile(str, data, 0777)
 	utility.CheckError(err)
@@ -253,7 +254,7 @@ func writeToFileHelper(fname string, video utility.Video) string {
 // This method loads up a local json file to see which files are available in the local file system. Once
 // the read has been completed, the files are then processed into the utility.utility.FileSys map accordingly
 func processLocalVideosIntoFileSys() {
-	locFiles, err := ioutil.ReadFile("./filesys/localFiles.json")
+	locFiles, err := ioutil.ReadFile(consts.DirPath + "/localFiles.json")
 	utility.CheckError(err)
 	files := make([]utility.File, 0)
 
@@ -265,27 +266,30 @@ func processLocalVideosIntoFileSys() {
 		Id:    1,
 		Files: make(map[string]utility.Video),
 	}
-	for _, value := range filePaths.Files {
-		colorprint.Info("Processing " + value.Name + " at " + value.Path)
+	fmt.Println("========================    PROCESSING LOCAL FILES FOR SHARING    ========================")
+	fmt.Println("==========================================================================================")
+	for index, value := range filePaths.Files {
+
 		dat, err := ioutil.ReadFile(value.Path)
 		utility.CheckError(err)
 		colorprint.Info("---------------------------------------------------------------------------")
-		colorprint.Info("utility.Video:" + value.Name + " has " + strconv.Itoa(len(dat)/bytecount) + " segments.")
+		colorprint.Info(strconv.Itoa(index+1) + ": Processing " + value.Name + " at " + value.Path + " with " + strconv.Itoa(len(dat)/consts.Bytecount) + " segments.")
 		segsAvail, vidMap := convByteArrayToSeg(dat)
 
 		vid := utility.Video{
 			Name:      value.Name,
-			SegNums:   int64(len(dat) / bytecount),
+			SegNums:   int64(len(dat) / consts.Bytecount),
 			SegsAvail: segsAvail,
 			Segments:  vidMap,
 		}
-		utility.PrintAvSegs(segsAvail)
 		fileSysLock.Lock()
 		localFileSys.Files[value.Name] = vid
 		fileSysLock.Unlock()
 		colorprint.Info("Completed Processing " + value.Name + " at " + value.Path)
 		colorprint.Info("---------------------------------------------------------------------------")
+
 	}
+	fmt.Println("===============================    PROCESSING COMPLETE    ================================\n\n\n")
 
 }
 
@@ -302,30 +306,29 @@ func convByteArrayToSeg(bytes []byte) ([]int64, map[int]utility.VidSegment) {
 	counter, counter2, counter3 := 1, 1, 1
 	progstr := "="
 	blen := len(bytes)
-	altc := (blen / 100)
+	altc := (blen / int(consts.Factor))
 	for index, element := range bytes {
 		eightBSeg = append(eightBSeg, element)
-		if counter == bytecount {
+		if counter == consts.Bytecount {
 			counter = 0
 			vidSeg = utility.VidSegment{
-				Id:   ((index % bytecount) + 1),
+				Id:   ((index % consts.Bytecount) + 1),
 				Body: eightBSeg,
 			}
-			vidmap[((index / bytecount) + 1)] = vidSeg
-			segsAvail = append(segsAvail, int64(((index / bytecount) + 1)))
+			vidmap[((index / consts.Bytecount) + 1)] = vidSeg
+			segsAvail = append(segsAvail, int64(((index / consts.Bytecount) + 1)))
 			eightBSeg = []byte{}
 		}
 		counter++
 		counter2++
 		counter3++
 		if counter2 == altc {
-			progstr += "="
-			fmt.Printf("\r[%s]  - %d%%", progstr, ((counter3*100)/blen + 1))
+			progstr += "~"
+			fmt.Printf("\r|%s|  - %d%%", progstr, ((counter3*100)/blen + 1))
 			counter2 = 0
 		}
 	}
 	fmt.Println()
-	colorprint.Debug("SEGMENTS PROCESSED: " + strconv.Itoa((len(segsAvail))))
 	return segsAvail, vidmap
 }
 
@@ -366,22 +369,25 @@ func setUpRPC(nodeRPC string) {
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-// instr(nodeRPC string, nodeUDP string)
+// Instr(nodeRPC string, nodeUDP string)
 // --------------------------------------------------------------------------------------------
 // DESCRIPTION:
 // -------------------
 // This method responds to the user input requests
-func instr(nodeRPC string, nodeUDP string) {
+func Instr(nodeRPC string, nodeUDP string) {
 	var input string
 	var fname string
 	for i := 0; i >= 0; i++ {
-		colorprint.Info(">>>> Please type in the command")
+		fmt.Println()
+		colorprint.Info(">>>> Please enter a command")
 		fmt.Scan(&input)
 		cmd := input
 		if input == "get" {
 			getHelper(nodeRPC, nodeUDP, input, fname, cmd)
 		} else if input == "list" {
-			utility.PrintFileSysTable()
+			utility.PrintFileSysTable(consts.DirPath)
+		} else if input == "help" {
+			ui.Help()
 		}
 	}
 }
@@ -420,16 +426,19 @@ func getHelper(nodeRPC string, nodeUDP string, input string, fname string, cmd s
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 func main() {
+	ui.Intro()
 	// ========================================
 	fileSysLock = &sync.RWMutex{}
 	processLocalVideosIntoFileSys()
 	// ========================================
+
 	if len(os.Args) == 3 {
 		nodeRPC := os.Args[1]
 		nodeUDP := os.Args[2]
 		if !utility.ValidIP(nodeRPC, "[node RPC ip:port]") || !utility.ValidIP(nodeUDP, "[node UDP ip:port]") {
 			os.Exit(-1)
 		}
+
 		go setUpRPC(nodeRPC)
 		instr(nodeRPC, nodeUDP)
 
