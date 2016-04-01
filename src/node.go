@@ -26,7 +26,7 @@ import (
 	"net"
   "net/rpc"
 	"os"
-  //"strconv"
+  "sort"
 	"sync"
 	"time"
 )
@@ -132,14 +132,14 @@ func printFileTable() {
   fmt.Println(" -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ ")
 }
 
-/* Returns true if an identifier is between this node and successor on the id circle.
+/* Returns true if an identifier is between this node and successor (or some other node) on the id circle.
  */
-func isBetweenMeAndSuccessor(iden int64, me int64, suc int64) bool {
+func isBetween(iden int64, me int64, suc int64) bool {
   if suc < me {
-    if iden >= me && iden >= suc {
+    if iden <= me && iden >= suc {
       return true
-    } else if iden < me && iden <= suc {
-      return true
+    } else if iden <= me && iden <= suc {
+      return false
     } else {
       return false
     }
@@ -149,6 +149,8 @@ func isBetweenMeAndSuccessor(iden int64, me int64, suc int64) bool {
     } else {
       return false
     }
+  } else {
+    return false
   }
 }
 
@@ -158,6 +160,7 @@ func isBetweenMeAndSuccessor(iden int64, me int64, suc int64) bool {
 /* Updates a finger table entry at this node. Called during entry/exit/failures.
  */
 func (this *NodeRPCService) UpdateFingerTableEntry(msg *Msg, reply *Reply) error {
+  reply.Val = ""
   // Lock 'em up.
   fingerLocker.Lock()
   defer fingerLocker.Unlock()
@@ -166,43 +169,82 @@ func (this *NodeRPCService) UpdateFingerTableEntry(msg *Msg, reply *Reply) error
   fingerLocker.fingerTable[msg.Id] = msg.Val
 
   // Let the other guy know it went well.
-  reply.Val = "Ok"
+  reply.Val = "ok"
   return nil
 }
 
-/* Updates a file table entry at this node.
- */
-func (this *NodeRPCService) UpdateFileTableEntry(msg *Msg, reply *Reply) error {
-  // Lock 'em up.
-  fileLocker.Lock()
-  defer fileLocker.Unlock()
-
-  // Update.
-  fileLocker.fileTable[msg.Id] = msg.Val
-
-  // Let the other guy know it went well.
-  reply.Val = "Ok"
-  return nil
-}
-
-/* Attempt to locate appropriate successor for caller node.
+/* Iteratively locate appropriate successor for caller node.
  */
 func (this *NodeRPCService) Discover(msg *Msg, reply *Reply) error {
+  reply.Val = ""
   // Lock for reading.
   fingerLocker.RLock()
   defer fingerLocker.RUnlock()
 
+  currentClosestSuccessor := int64(9999)
   // Find the best fit given an id.
   for id := range fingerLocker.fingerTable {
-    if (id >= myIdentifier) && (id <= startIdentifier) {
-      fingerLocker.fingerTable[id] = startAddr
-    } else {
-      fingerLocker.fingerTable[id] = nodeAddr
+    if isBetween(id, msg.Id, myIdentifier) && isBetween(id, msg.Id, currentClosestSuccessor) {
+      msg.Id = id
+      msg.Val = fingerLocker.fingerTable[id]
+      currentClosestSuccessor = msg.Id
     }
   }
 
   // Let the other guy know it went well.
-  reply.Val = "Ok"
+  reply.Val = "ok"
+  return nil
+}
+
+/* Uploads a file to this node, and then to r successor nodes.
+ */
+func (this *NodeRPCService) UploadFile(msg *Msg, reply *Reply) error {
+  reply.Val = ""
+  // Lock up file map for byte-byte mapping
+  fileLocker.Lock()
+  defer fileLocker.Unlock()
+
+
+  reply.Val = "ok"
+  return nil
+}
+
+/* Replicates a file across r successor nodes.
+ */
+func (this *NodeRPCService) ReplicateFile(msg *Msg, reply *Reply) error {
+  reply.Val = ""
+  // Replicate across r successor nodes. Sort the map first.
+  var idsOfClosestSuccessors []int
+  fingerLocker.RLock()
+  for id := range fingerLocker.fingerTable {
+    idsOfClosestSuccessors = append(idsOfClosestSuccessors, int(id))
+  }
+  sort.Ints(idsOfClosestSuccessors)
+
+  // XXX some bugs here----------
+  file := int64(000)
+  i := 0
+  // RPC chain across r nodes.
+  for _, k := range idsOfClosestSuccessors {
+    if (int64(k) >= myIdentifier) {
+      nodeRPCHandler, err := rpc.Dial("tcp", fingerLocker.fingerTable[int64(k)])
+      checkError(err)
+      msg := Msg {file, fingerLocker.fingerTable[int64(k)]}
+      var reply Reply
+      err = nodeRPCHandler.Call("NodeRPCService.UploadFile", &msg, &reply) // returns id in msg.Id, and ip:port in msg.Val
+      checkError(err)
+      nodeRPCHandler.Close()
+    }
+    i++
+    if (i >= replicationFactor) {
+      break
+    }
+  }
+  fingerLocker.RUnlock()
+  // XXX------------------------
+
+  // Let the other guy know it went well.
+  reply.Val = "ok"
   return nil
 }
 
@@ -281,8 +323,8 @@ func connectToSystem(nodeAddr string, startAddr string) {
   printFingerTable()
 
   // Initialize values (base values of RPC chain)
-  msg := Msg {myIdentifier, ""}
-  currentClosestSuccessor := startIdentifier // recursively gets smaller
+  msg := Msg {myIdentifier, nodeAddr}
+  currentClosestSuccessor := startIdentifier // iteratively gets closer to myIdentifier
   currentClosestValue := startAddr
   var reply Reply
 
@@ -290,13 +332,28 @@ func connectToSystem(nodeAddr string, startAddr string) {
   for {
     err = nodeRPCHandler.Call("NodeRPCService.Discover", &msg, &reply) // returns id in msg.Id, and ip:port in msg.Val
     checkError(err)
-    if isBetweenMeAndSuccessor(msg.Id, myIdentifier, currentClosestSuccessor)
-        && (reply.Val == "ok") {
+
+    fmt.Println(msg.Id)
+
+    // Some guy is closer, update finger table accordingly.
+    if isBetween(msg.Id, myIdentifier, currentClosestSuccessor) && (reply.Val == "ok") {
       currentClosestSuccessor = msg.Id
       currentClosestValue = msg.Val
+      fingerLocker.Lock()
+      for id := range fingerLocker.fingerTable {
+        if isBetween(id, myIdentifier, currentClosestSuccessor) {
+          fingerLocker.fingerTable[id] = currentClosestValue
+        }
+      }
+      fingerLocker.Unlock()
+      break
+
+    // TODO: add non ok reply.Val for special cases/err handling.
     } else if (reply.Val != "ok")  {
       fmt.Println("--> Something went wrong with RPC.Discover: ", reply.Val)
       break
+
+    // Went over the node-successor window, stop looping.
     } else {
       break
     }
