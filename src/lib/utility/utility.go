@@ -109,27 +109,13 @@ func CheckError(err error) {
 	}
 }
 
-// printAvSegs(segsAvail []int64)
-// --------------------------------------------------------------------------------------------
-// DESCRIPTION:
-// -------------------
-// Prints list of ids for available segment nums
-func PrintAvSegs(segsAvail []int64) {
-	colorprint.Warning("Segments available")
-	for _, element := range segsAvail {
-		fmt.Printf("\rProcessing segment[%d]", element)
-	}
-	fmt.Println()
-	colorprint.Warning("XXXXXXXXXXXXXXXXX")
-}
-
 // SaveFileInfoToJson()
 // --------------------------------------------------------------------------------------------
 // DESCRIPTION:
 // -------------------
 // This method saves file information into a json file in the filesys folder
-func SaveFileInfoToJson(jsondata []byte) {
-	jsonFile, err := os.Create("./filesys/localFiles.json")
+func SaveFileInfoToJson(jsondata []byte, dirPath string) {
+	jsonFile, err := os.Create(dirPath + "/localFiles.json")
 	CheckError(err)
 	jsonFile.Write(jsondata)
 	jsonFile.Close()
@@ -155,8 +141,8 @@ func ValidIP(ipAddress string, field string) bool {
 // DESCRIPTION:
 // -------------------
 // Prints out the list of locally available files and their paths and sizes
-func PrintFileSysTable() {
-	locFiles, err := ioutil.ReadFile("./filesys/localFiles.json")
+func PrintFileSysTable(dirPath string) {
+	locFiles, err := ioutil.ReadFile(dirPath + "/localFiles.json")
 	CheckError(err)
 	files := make([]File, 0)
 
