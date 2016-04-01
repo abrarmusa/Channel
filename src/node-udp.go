@@ -32,6 +32,7 @@ import (
   "math"
   "strconv"
   "math/big"
+  "runtime"
   //"transfile"
 )
 
@@ -66,6 +67,9 @@ var identifier int64
 var m float64
 var c chan string
 var myAddr string
+
+var aliveChan chan bool
+//var timeout chan bool
 
 // The finger table.
 // Reading? Wrap RLock/RUnlock: lock.RLock(), lock.fingerTable[..], lock.RUnlock()
@@ -151,34 +155,56 @@ func computeDistBetweenTwoHashes(Key1 string, Key2 string) int64 {
 
 /* Send periodic heartbeats to let predecessor know this node is still alive.
  */
-func sendAliveMessage(conn *net.UDPConn, id string) {
-  for {
-    // send this node's id as an alive message
-      Cmd string
-  SourceAddr string
-  DestAddr string
-  Key string
-  Val string
-    msg := CommandMessage{"_heartbeat", myAddr, predecessorAddr, "status", "alive"}
+func sendAliveMessage() {
+      msg := CommandMessage{"_heartbeat", myAddr, predecessorAddr, strconv.FormatInt(identifier, 10), myAddr}
+      aliveMessage, err := json.Marshal(msg)
+      checkError(err)
+      b := []byte(aliveMessage)
+      sendMessage(predecessorAddr, b)
+}
+
+func askIfAlive(timeout chan bool) {
+    msg := CommandMessage{"_alive?", myAddr, successorAddr, strconv.FormatInt(identifier, 10), myAddr}
     aliveMessage, err := json.Marshal(msg)
     checkError(err)
     b := []byte(aliveMessage)
-    _, err = conn.Write(b)
-    checkError(err)
-
+    sendMessage(successorAddr, b)
     time.Sleep(5 * time.Second)
+    timeout <- true
+}
+
+/* Handle heartbeats
+ */
+func handleHeartbeats() {
+
+  for {
+    if successorAddr != "" && predecessorAddr != "" {
+      timeout := make(chan bool, 1)
+      go askIfAlive(timeout)
+
+      select {
+      case <-aliveChan:
+        fmt.Println("I can feel your heatbeat, my one and only ... successor: ", successorAddr)
+      case <-timeout:
+        // timed out, my successor might be dead. time to make some changes in our secret circle
+        fmt.Println("Timed out. Did not receive heartbeat from successor. Node might be dead")
+      }
+      time.Sleep(5 * time.Second)
+    } else {
+        //fmt.Println("Looping until we have both successor and predecessor")
+    }
   }
 }
 
 func locatePredecessor(conn net.Conn) {
-  fmt.Println("Locating predecessor...")
-  msg := CommandMessage{"_locPred", myAddr, "", "", ""}
+  //fmt.Println("Locating predecessor...")
+  msg := CommandMessage{"_locPred", myAddr, "", strconv.FormatInt(identifier, 10), ""}
   msgInJSON, err := json.Marshal(msg)
   checkError(err)
   buf := []byte(msgInJSON)
   _, err = conn.Write(buf)
   checkError(err)
-  fmt.Println("Sent command: ", string(buf[:]))
+  //fmt.Println("Sent command: ", string(buf[:]))
 }
 
 /* Perform recursive search through finger tables to place me at the right spot.
@@ -186,18 +212,18 @@ func locatePredecessor(conn net.Conn) {
 func locateSuccessor(conn net.Conn, id string) {
   // recursive search through finger tables
   // use computeDistBetweenTwoHashes(Key1 string, Key2 string)
-  fmt.Println("Locating successor...")
+  //fmt.Println("Locating successor...")
 
   // Send a special message of Value "where", so that node knows it wants to find its place in the identifier circle.
   msg := CommandMessage{"_discover", id, "", "", ""}
   msgInJSON, err := json.Marshal(msg)
   checkError(err)
-  fmt.Println("JSON: ", string(msgInJSON))
+  //fmt.Println("JSON: ", string(msgInJSON))
   buf := []byte(msgInJSON)
   // The listening function should have an interface{} to deal with a "where" message.
   // Handle this write in the listenForControlMessages function
   _, err = conn.Write(buf)
-  fmt.Println("Sent command: ", string(buf[:]))
+  //fmt.Println("Sent command: ", string(buf[:]))
   checkError(err)
 
   // The response should hold the conn of the successor.
@@ -219,8 +245,8 @@ func getNodeInfo(nodeAddr string, iden int64) {
 }
 
 func initFingerTable(conn net.Conn, nodeAddr string) {
-  fmt.Println("Successor Address: ", successorAddr)
-  fmt.Println("Initializing finger table")
+  //fmt.Println("Successor Address: ", successorAddr)
+  //fmt.Println("Initializing finger table")
   thisIden := getIdentifier(nodeAddr)
   // for every entry in the finger table i.e
   //limit := math.Pow(2, m)
@@ -234,7 +260,7 @@ func getIdentifier(Key string) int64 {
   id := computeSHA1Hash(Key)
   k := big.NewInt(0)
   if _, ok := k.SetString(id, 16); ok {
-    fmt.Println("Number: ", k)
+    //fmt.Println("Number: ", k)
   } else {
     fmt.Println("Unable to parse into big int")
   }
@@ -242,7 +268,7 @@ func getIdentifier(Key string) int64 {
   //checkError(err)
   power := int64(math.Pow(2, m))
   ret := (k.Mod(k, big.NewInt(power))).Int64()
-  fmt.Println("Identifier is: ", ret)
+  //fmt.Println("Identifier is: ", ret)
   return ret
 }
 
@@ -255,11 +281,6 @@ func getVal(Key string) (string, bool) {
   }
 }
 
-/* Handle messages from .
- */
-func listenForControlMessages(nodeAddr string) {
-  // Todo
-}
 
 func sendToNextBestNode(KeyIdentifier int64, msg CommandMessage) {
   //KeyIdentifier := getIdentifier(msg.SourceAddr)
@@ -268,10 +289,10 @@ func sendToNextBestNode(KeyIdentifier int64, msg CommandMessage) {
   minDistanceSoFar := int64(math.MaxInt64)
   for nodeIden, nodeAddr := range ftab {
     diff := nodeIden - KeyIdentifier
-    fmt.Println("NodeIden in ftab: ", nodeIden)
-    fmt.Println("KeyIdentifier to find: ", KeyIdentifier)
-    fmt.Println("DIFFERENCE: ", diff)
-    fmt.Println("Min distance so far", minDistanceSoFar)
+    // fmt.Println("NodeIden in ftab: ", nodeIden)
+    // fmt.Println("KeyIdentifier to find: ", KeyIdentifier)
+    // fmt.Println("DIFFERENCE: ", diff)
+    // fmt.Println("Min distance so far", minDistanceSoFar)
     if diff < minDistanceSoFar {
       minDistanceSoFar = diff
       closestNode = nodeAddr
@@ -292,44 +313,30 @@ func sendToNextBestNode(KeyIdentifier int64, msg CommandMessage) {
 func sendMessage(addr string, msg []byte) {
   //tcpAddr, err := net.ResolveTCPAddr("tcp", addr)
   //checkError(err)
-  fmt.Println("Dialing to send message...")
-  fmt.Println("Address to dial: ", addr)
+  //fmt.Println("Dialing to send message...")
+  //fmt.Println("Address to dial: ", addr)
   fmt.Println("Sending Message: ", string(msg))
   conn, err := net.Dial("udp", addr)
   checkError(err)
+  defer conn.Close()
   _, err = conn.Write(msg)
   checkError(err)
 }
 
-// func betweenIdens(suc int64, me int64, iden int64) bool {
-//   if i1 < i0 {
-//     // passes end point on identifier circle so add total # to i1
-//     i1 += int64(math.Pow(2.0, float64(m)))
-//     fmt.Println("CHANGING I1 TO ", i1)
-//   }
-//   if iden < i0 && iden < i1 {
-//     iden += int64(math.Pow(2.0, float64(m)))
-//     fmt.Println("CHANGING IDEN TO ", i1)
-//   }
-//   if iden > i0 && iden <= i1 {
-//       return true
-//   }
-//   return false
-// }
 func betweenIdens(suc int64, me int64, iden int64) bool {
   if suc < me {
-    fmt.Println("Successor less than me")
+    //fmt.Println("Successor less than me")
     if iden > me && iden > suc {
-      fmt.Println("Between me and successor!")
+      //fmt.Println("Between me and successor!")
       return true
     } else if iden < me && iden < suc {
-      fmt.Println("Between me and successor!")
+      //fmt.Println("Between me and successor!")
       return true
     }
   } else if suc > me {
-    fmt.Println("Successor greater than me")
+    //fmt.Println("Successor greater than me")
     if iden > me && iden < suc {
-      fmt.Println("Between me and successor!")
+      //fmt.Println("Between me and successor!")
       return true
     }
   }
@@ -364,6 +371,14 @@ func provideInfo(msg CommandMessage, nodeAddr string) {
   }
 }
 
+func sendPredInfo(src string, succ string) {
+  responseMsg := CommandMessage{"_resLocPred", myAddr, src, "predecessor", succ}
+  resp, err := json.Marshal(responseMsg)
+  checkError(err)
+  buf := []byte(resp)
+  sendMessage(src, buf)
+}
+
 /* Only called when there are no nodes yet that are started up. This node becomes the first node.
  */
 func startUpSystem(nodeAddr string) {
@@ -371,6 +386,8 @@ func startUpSystem(nodeAddr string) {
 
   serverAddr, err := net.ResolveUDPAddr("udp", nodeAddr)
   checkError(err)
+
+  go handleHeartbeats()
 
   fmt.Println("Trying to listen on: ", serverAddr)
   conn, err := net.ListenUDP("udp", serverAddr)
@@ -388,11 +405,23 @@ func startUpSystem(nodeAddr string) {
     fmt.Println("Received Command: ", string(buf[:n]))
     checkError(err)
     err = json.Unmarshal(buf[:n], &msg)
-    fmt.Println("Cmd: ", msg.Cmd)
+    //fmt.Println("Cmd: ", msg.Cmd)
     k, err := strconv.ParseInt(msg.Key, 10, 64)
     //checkError(err)
 
     switch msg.Cmd {
+      case "_heartbeat":
+        if msg.SourceAddr == successorAddr {
+          // successor is still alive so all good
+          aliveChan <- true
+        }
+      case "_alive?":
+        // received an alive query - send back message to tell I'm still here
+        if predecessorAddr == msg.SourceAddr {
+          sendAliveMessage()
+        } else {
+            fmt.Println("Received alive query from an unexpected node with addr: ", msg.SourceAddr)
+        }     
       case "_getInfo":
         provideInfo(msg, nodeAddr)
       case "_getVal":
@@ -428,15 +457,22 @@ func startUpSystem(nodeAddr string) {
           sendToNextBestNode(k,msg)
         }
       case "_locPred" :
-        // TODO
+        if msg.SourceAddr == successorAddr {
+          sendPredInfo(msg.SourceAddr, nodeAddr)
+        } else {
+          // send to next best node (?)
+          sendToNextBestNode(k, msg)
+        }
       case "_resLocPred":
-        // TODO
+        // key in this case would hold asking node's identifier
+        predecessorAddr = msg.Val;
+        fmt.Println("Updated predecessor to: ", predecessorAddr)
       case "_resDisc" :
         successor = getIdentifier(msg.Val)
         successorAddr = msg.Val
         c <- "okay"
         fmt.Println("Successor updated to address: ", msg.Val)
-        fmt.Println("Successor Identifier is: ", successor)
+        //fmt.Println("Successor Identifier is: ", successor)
       case "_discover":
         nodeIdentifier := getIdentifier(msg.SourceAddr)
         if successor == -1 {
@@ -452,11 +488,16 @@ func startUpSystem(nodeAddr string) {
           // update successor to new node
           successor = nodeIdentifier
           successorAddr = msg.SourceAddr
+          // update predecessor too
+          predecessorAddr = msg.SourceAddr
           break
         }
         if nodeIdentifier >= identifier && nodeIdentifier <= successor {
           // incoming node belongs between this node and its current successor
-          // update finger table
+          // Update current successor's pred to new node
+          sendPredInfo(successorAddr, msg.SourceAddr)
+          // Update new node's pred to me (do we really need this since new node explicitly asks for pred)
+          sendPredInfo(msg.SourceAddr, myAddr)
           fmt.Println("New node fits between me and my successor. Updating finger table...")
           ftab[nodeIdentifier] = msg.SourceAddr
           // notify new node of its successor (current successor)
@@ -536,6 +577,9 @@ func main() {
     c = make(chan string)
     identifier = getIdentifier(myAddr)
 
+    aliveChan = make(chan bool, 1)
+    //timeout = make(chan bool, 1)
+
     fmt.Println("THIS NODE'S IDENTIFIER IS: ", identifier)
 
     // Set both args as equal on the command line if no node is operational yet.
@@ -546,17 +590,19 @@ func main() {
     // } else {
     //   connectToSystem(nodeAddr, startAddr)
     // }
-    if (nodeAddr == startAddr) {
+    if (myAddr == startAddr) {
       fmt.Println("First node in system. Listening for incoming connections...")
-      startUpSystem(nodeAddr)
+      go startUpSystem(myAddr)
     } else {
       //go func() {
-        go startUpSystem(nodeAddr)
-        go connectToSystem(nodeAddr, startAddr)
+        go startUpSystem(myAddr)
+        go connectToSystem(myAddr, startAddr)
       //}()
     }
   }
-  for {}
+  for {
+    runtime.Gosched()
+  }
 
   // Setup UDP server
  //  u := transfile.UdpInfo{
