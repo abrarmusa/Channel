@@ -165,7 +165,7 @@ func askIfAlive(timeout chan bool, addr string) {
     checkError(err)
     b := []byte(aliveMessage)
     sendMessage(addr, b)
-    time.Sleep(10 * time.Second)
+    time.Sleep(5 * time.Second)
     timeout <- true
 }
 
