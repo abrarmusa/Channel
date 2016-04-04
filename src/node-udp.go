@@ -53,12 +53,14 @@ type CommandMessage struct {
   DestAddr string
   Key string
   Val string
+  Store map[string]string
 }
 
 // Some static command line options.
 var traceMode bool
 var replicationFactor int
 var store map[string]string
+var backupStore map[string]string
 var ftab map[int64]string
 var successor int64
 var successorAddr string
@@ -152,7 +154,7 @@ func computeSHA1Hash(Key string) string {
 /* Send periodic heartbeats to let predecessor know this node is still alive.
  */
 func sendAliveMessage(addr string) { 
-      msg := CommandMessage{"_heartbeat", myAddr, addr, strconv.FormatInt(identifier, 10), myAddr}
+      msg := CommandMessage{"_heartbeat", myAddr, addr, strconv.FormatInt(identifier, 10), myAddr, nil}
       aliveMessage, err := json.Marshal(msg)
       checkError(err)
       b := []byte(aliveMessage)
@@ -160,7 +162,7 @@ func sendAliveMessage(addr string) {
 }
 
 func askIfAlive(timeout chan bool, addr string) {
-    msg := CommandMessage{"_alive?", myAddr, addr, strconv.FormatInt(identifier, 10), myAddr}
+    msg := CommandMessage{"_alive?", myAddr, addr, strconv.FormatInt(identifier, 10), myAddr, nil}
     aliveMessage, err := json.Marshal(msg)
     checkError(err)
     b := []byte(aliveMessage)
@@ -273,14 +275,19 @@ func stabilizeNode(position string) {
   // BUT we need to be able to detect a dead predecessor for this to work (send acks for with every _heartbeat msg?)
   // Think
 
+  // This implementation sends a proposal to every node in the finger table hoping
+  // that someone would want a predecessor (since we need a successor). Also, at the end,
+  // we send a proposal to our predecessor to if we only have 2 nodes left in the system after
+  // a node dies
+
   for _, addr := range ftab {
-    msg := CommandMessage{"_proposal", myAddr, addr, position, strconv.FormatInt(identifier, 10)}
+    msg := CommandMessage{"_proposal", myAddr, addr, position, strconv.FormatInt(identifier, 10), nil}
     buf := getJSONBytes(msg)
     sendMessage(addr, buf)
   }
 
   // also send to predecessor(?)
-  msg := CommandMessage{"_proposal", myAddr, predecessorAddr, position, strconv.FormatInt(identifier, 10)}
+  msg := CommandMessage{"_proposal", myAddr, predecessorAddr, position, strconv.FormatInt(identifier, 10), nil}
   buf := getJSONBytes(msg)
   sendMessage(predecessorAddr, buf)
 
@@ -288,7 +295,7 @@ func stabilizeNode(position string) {
 
 func locatePredecessor(conn net.Conn) {
   //fmt.Println("Locating predecessor...")
-  msg := CommandMessage{"_locPred", myAddr, "", strconv.FormatInt(identifier, 10), ""}
+  msg := CommandMessage{"_locPred", myAddr, "", strconv.FormatInt(identifier, 10), "", nil}
   msgInJSON, err := json.Marshal(msg)
   checkError(err)
   buf := []byte(msgInJSON)
@@ -305,7 +312,7 @@ func locateSuccessor(conn net.Conn, id string) {
   //fmt.Println("Locating successor...")
 
   // Send a special message of Value "where", so that node knows it wants to find its place in the identifier circle.
-  msg := CommandMessage{"_discover", id, "", "", ""}
+  msg := CommandMessage{"_discover", id, "", "", "", nil}
   msgInJSON, err := json.Marshal(msg)
   checkError(err)
   //fmt.Println("JSON: ", string(msgInJSON))
@@ -327,7 +334,7 @@ func locateSuccessor(conn net.Conn, id string) {
 }
 
 func getNodeInfo(nodeAddr string, iden int64) {
-  msg := CommandMessage{"_getInfo", nodeAddr, "", "", strconv.FormatInt(iden, 10)}
+  msg := CommandMessage{"_getInfo", nodeAddr, "", "", strconv.FormatInt(iden, 10), nil}
   jsonMsg, err := json.Marshal(msg)
   checkError(err)
   b := []byte(jsonMsg)
@@ -435,20 +442,20 @@ func provideInfo(msg CommandMessage, nodeAddr string) {
   iden, err := strconv.ParseInt(msg.Val, 10, 64)
   checkError(err)
   if betweenIdens(successor, identifier, iden) {
-    reply := CommandMessage{"_resInfo", nodeAddr, msg.SourceAddr, msg.Val, successorAddr}
+    reply := CommandMessage{"_resInfo", nodeAddr, msg.SourceAddr, msg.Val, successorAddr, nil}
     jsonReply, err := json.Marshal(reply)
     checkError(err)
     b := []byte(jsonReply)
     sendMessage(msg.SourceAddr, b)
   } else if identifier == iden {
     // heloo.. is it me you're looking for
-    reply := CommandMessage{"_resInfo", nodeAddr, msg.SourceAddr, msg.Val, nodeAddr}
+    reply := CommandMessage{"_resInfo", nodeAddr, msg.SourceAddr, msg.Val, nodeAddr, nil}
     jsonReply, err := json.Marshal(reply)
     checkError(err)
     b := []byte(jsonReply)
     sendMessage(msg.SourceAddr, b)
   } else if val, ok := ftab[iden]; ok {
-    reply := CommandMessage{"_resInfo", nodeAddr, msg.SourceAddr, msg.Val, val}
+    reply := CommandMessage{"_resInfo", nodeAddr, msg.SourceAddr, msg.Val, val, nil}
     jsonReply, err := json.Marshal(reply)
     checkError(err)
     b := []byte(jsonReply)
@@ -460,7 +467,7 @@ func provideInfo(msg CommandMessage, nodeAddr string) {
 }
 
 func sendPredInfo(src string, succ string) {
-  responseMsg := CommandMessage{"_resLocPred", myAddr, src, "predecessor", succ}
+  responseMsg := CommandMessage{"_resLocPred", myAddr, src, "predecessor", succ, nil}
   resp, err := json.Marshal(responseMsg)
   checkError(err)
   buf := []byte(resp)
@@ -477,6 +484,8 @@ func startUpSystem(nodeAddr string) {
 
   go handlePredecessorHeartbeats()
   go handleSuccessorHeartbeats()
+
+  go maintainBackup()
   
 
   fmt.Println("Trying to listen on: ", serverAddr)
@@ -500,10 +509,19 @@ func startUpSystem(nodeAddr string) {
     //checkError(err)
 
     switch msg.Cmd {
+      case "_storeBackup":
+        sendKeyMap(msg.SourceAddr)
+      case "_resStoreBackup":
+        fmt.Println("Setting backup store to: ", msg.Store)
+        backupStore = msg.Store
+      case "_copyStore":
+        // DONT KNOW IF I NEED THIS
+        fmt.Println("Received command to set our store to provided store: ", msg.Store)
+        store = msg.Store
       case "_proposal":
         if msg.Key == "successor" && predecessor == -1 {
           // send a message 
-          responseMsg := CommandMessage{"_resProposal", myAddr, msg.SourceAddr, "successor", strconv.FormatInt(identifier, 10)}
+          responseMsg := CommandMessage{"_resProposal", myAddr, msg.SourceAddr, "successor", strconv.FormatInt(identifier, 10), nil}
           b := getJSONBytes(responseMsg)
           sendMessage(msg.SourceAddr, b)
         } else if predecessor != -1 && predecessorAddr != "" {
@@ -517,7 +535,7 @@ func startUpSystem(nodeAddr string) {
           successorAddr = msg.SourceAddr
           fmt.Println("Found new successor with address: ", successorAddr)
           // send a positive msg back so it knows we accepted proposal and it sets its predecessor
-          responseMsg := CommandMessage{"_resProposal", myAddr, msg.SourceAddr, "predecessor", strconv.FormatInt(identifier, 10)}
+          responseMsg := CommandMessage{"_resProposal", myAddr, msg.SourceAddr, "predecessor", strconv.FormatInt(identifier, 10), nil}
           b := getJSONBytes(responseMsg)
           sendMessage(msg.SourceAddr, b)
         } else if msg.Key == "predecessor" && predecessor == -1 {
@@ -526,7 +544,7 @@ func startUpSystem(nodeAddr string) {
           fmt.Println("Found new predecessor with address: ", predecessorAddr)
           // PROBABLY WONT NEED THIS STEP FOR ONE WAY STABILIZATION
           // send a positive msg back so it knows we accepted proposal and it sets its successor if needed
-          responseMsg := CommandMessage{"_resProposal", myAddr, msg.SourceAddr, "successor", strconv.FormatInt(identifier, 10)}
+          responseMsg := CommandMessage{"_resProposal", myAddr, msg.SourceAddr, "successor", strconv.FormatInt(identifier, 10), nil}
           b := getJSONBytes(responseMsg)
           sendMessage(msg.SourceAddr, b)
         } else {
@@ -560,7 +578,7 @@ func startUpSystem(nodeAddr string) {
         v, haveKey := getVal(msg.Key)
         if haveKey {
           // respond with Value
-          responseMsg := CommandMessage{"_resVal", nodeAddr, msg.SourceAddr, msg.Key, v}
+          responseMsg := CommandMessage{"_resVal", nodeAddr, msg.SourceAddr, msg.Key, v, nil}
           resp, err := json.Marshal(responseMsg)
           checkError(err)
           buf = []byte(resp)
@@ -578,7 +596,7 @@ func startUpSystem(nodeAddr string) {
         if haveKey {
           // change Value
           store[msg.Key] = msg.Val
-          responseMsg := CommandMessage{"_resGen", nodeAddr, msg.SourceAddr, "", "Key Updated"}
+          responseMsg := CommandMessage{"_resGen", nodeAddr, msg.SourceAddr, "", "Key Updated", nil}
           resp, err := json.Marshal(responseMsg)
           checkError(err)
           buf = []byte(resp)
@@ -613,7 +631,7 @@ func startUpSystem(nodeAddr string) {
           ftab[nodeIdentifier] = msg.SourceAddr
           
           // notify new node of its successor (current successor)
-          responseMsg := CommandMessage {"_resDisc", nodeAddr, msg.SourceAddr, "", nodeAddr}
+          responseMsg := CommandMessage {"_resDisc", nodeAddr, msg.SourceAddr, "", nodeAddr, nil}
           resMsg, err := json.Marshal(responseMsg)
           checkError(err)
           buf := []byte(resMsg)
@@ -636,7 +654,7 @@ func startUpSystem(nodeAddr string) {
           fmt.Println("New node fits between me and my successor. Updating finger table...")
           ftab[nodeIdentifier] = msg.SourceAddr
           // notify new node of its successor (current successor)
-          responseMsg := CommandMessage {"_resDisc", nodeAddr, msg.SourceAddr, "", successorAddr}
+          responseMsg := CommandMessage {"_resDisc", nodeAddr, msg.SourceAddr, "", successorAddr, nil}
           resMsg, err := json.Marshal(responseMsg)
           checkError(err)
           buf := []byte(resMsg)
@@ -696,6 +714,28 @@ func getJSONBytes(message CommandMessage) []byte {
   return []byte(resp)
 }
 
+func sendKeyMap(addr string) {
+  msg := CommandMessage{"_resStoreBackup", myAddr, addr, "", "", store}
+  buf := getJSONBytes(msg)
+  sendMessage(addr, buf)
+}
+
+func getKeyMap(addr string) {
+  msg := CommandMessage{"_storeBackup", myAddr, addr, "", "", nil}
+  buf := getJSONBytes(msg)
+  sendMessage(addr, buf)
+}
+
+func maintainBackup() {
+  for {
+    if successorAddr != "" {
+      getKeyMap(successorAddr)
+    }
+    time.Sleep(2 * time.Second)
+  }
+}
+
+
 /* The main function.
  */
 func main() {
@@ -713,6 +753,14 @@ func main() {
     store = make(map[string]string)
     ftab = make(map[int64]string)
     m = 3
+
+    /* 
+      FOR TESTING ONLY
+    */
+      //store["I am ->"] = myAddr
+    /*
+      TESTING END
+    */
 
     successor = -1
     successorAddr = ""
