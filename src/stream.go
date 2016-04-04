@@ -1,9 +1,10 @@
+// REQUIRES A LOT OF REFACTORIZATION OFCOURSE
+// NEED TO MAKE FUNCTIONS MORE MODULAR - WITH PARAMS FOR DIFFERENT FILENAMES AND OUTPUT FILENAMES
+
+
 package main
 
 import (
-	//"bytes"
-	//"encoding/json"
-	//"fmt"
 	"log"
 	"os/exec"
 )
