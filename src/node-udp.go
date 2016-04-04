@@ -62,13 +62,15 @@ var store map[string]string
 var ftab map[int64]string
 var successor int64
 var successorAddr string
+var predecessor int64
 var predecessorAddr string
 var identifier int64
 var m float64
 var c chan string
 var myAddr string
 
-var aliveChan chan bool
+var successorAliveChannel chan bool
+var predecessorAliveChannel chan bool
 //var timeout chan bool
 
 // The finger table.
@@ -146,54 +148,142 @@ func computeSHA1Hash(Key string) string {
   return str
 }
 
-/* Computes the distance between two SHA1 hashes.
- */
-func computeDistBetweenTwoHashes(Key1 string, Key2 string) int64 {
-  // todo
-  return 69
-}
 
 /* Send periodic heartbeats to let predecessor know this node is still alive.
  */
-func sendAliveMessage() {
-      msg := CommandMessage{"_heartbeat", myAddr, predecessorAddr, strconv.FormatInt(identifier, 10), myAddr}
+func sendAliveMessage(addr string) { 
+      msg := CommandMessage{"_heartbeat", myAddr, addr, strconv.FormatInt(identifier, 10), myAddr}
       aliveMessage, err := json.Marshal(msg)
       checkError(err)
       b := []byte(aliveMessage)
-      sendMessage(predecessorAddr, b)
+      sendMessage(addr, b)
 }
 
-func askIfAlive(timeout chan bool) {
-    msg := CommandMessage{"_alive?", myAddr, successorAddr, strconv.FormatInt(identifier, 10), myAddr}
+func askIfAlive(timeout chan bool, addr string) {
+    msg := CommandMessage{"_alive?", myAddr, addr, strconv.FormatInt(identifier, 10), myAddr}
     aliveMessage, err := json.Marshal(msg)
     checkError(err)
     b := []byte(aliveMessage)
-    sendMessage(successorAddr, b)
-    time.Sleep(5 * time.Second)
+    sendMessage(addr, b)
+    time.Sleep(10 * time.Second)
     timeout <- true
 }
 
 /* Handle heartbeats
  */
-func handleHeartbeats() {
+// func handleHeartbeats() {
+
+//   for {
+//     if successorAddr != "" && predecessorAddr != "" {
+//       timeout_s := make(chan bool, 1)
+//       timeout_p := make(chan bool, 1)
+//       go askIfAlive(timeout_s, successorAddr)
+//       go askIfAlive(timeout_p, predecessorAddr)
+
+//       select {
+//       case <-successorAliveChannel:
+//         fmt.Println("Heartbeat from successor: ", successorAddr)
+//       case <-predecessorAliveChannel:
+//         fmt.Println("Heartbeat from predecessor", predecessorAddr)
+//       case <-timeout_s:
+//         // timed out, my successor might be dead. time to make some changes in our secret circle
+//         fmt.Println("Timed out on successor heartbeat")
+//         // locate new successor if any
+//         // update predecessor of new 
+//         successor = -1
+//         successorAddr = ""
+//         stabilizeNode("successor")
+//       case <-timeout_p:
+//         fmt.Println("Timed out on predecessor heartbeat")
+//         predecessor = -1
+//         predecessorAddr = ""
+//         //stabilizeNode()
+//       }     
+//       time.Sleep(5 * time.Second)
+//     } else {
+//         //fmt.Println("Looping until we have both successor and predecessor")
+//     }
+//   }
+// }
+
+func handlePredecessorHeartbeats() {
 
   for {
-    if successorAddr != "" && predecessorAddr != "" {
-      timeout := make(chan bool, 1)
-      go askIfAlive(timeout)
+    if predecessorAddr != "" {
+      timeout_p := make(chan bool, 1)
+      go askIfAlive(timeout_p, predecessorAddr)
 
       select {
-      case <-aliveChan:
-        fmt.Println("I can feel your heatbeat, my one and only ... successor: ", successorAddr)
-      case <-timeout:
-        // timed out, my successor might be dead. time to make some changes in our secret circle
-        fmt.Println("Timed out. Did not receive heartbeat from successor. Node might be dead")
-      }
+      case <-predecessorAliveChannel:
+        fmt.Println("Heartbeat from predecessor", predecessorAddr)
+      case <-timeout_p:
+        fmt.Println("Timed out on predecessor heartbeat")
+        predecessor = -1
+        predecessorAddr = ""
+        //stabilizeNode()
+      }     
       time.Sleep(5 * time.Second)
     } else {
         //fmt.Println("Looping until we have both successor and predecessor")
+      runtime.Gosched()
     }
   }
+}
+
+func handleSuccessorHeartbeats() {
+
+  for {
+    if successorAddr != "" {
+      timeout_s := make(chan bool, 1)
+      go askIfAlive(timeout_s, successorAddr)
+
+      select {
+      case <-successorAliveChannel:
+        fmt.Println("Heartbeat from successor: ", successorAddr)
+      case <-timeout_s:
+        // timed out, my successor might be dead. time to make some changes in our secret circle
+        fmt.Println("Timed out on successor heartbeat")
+        // locate new successor if any
+        // update predecessor of new 
+        successor = -1
+        successorAddr = ""
+        stabilizeNode("successor")
+      }     
+      time.Sleep(5 * time.Second)
+    } else {
+        //fmt.Println("Looping until we have both successor and predecessor")
+      runtime.Gosched()
+    }
+  }
+}
+
+func stabilizeNode(position string) {
+  // ONE SIMPLE WAY: inquire about our failed successors identifier
+  // A node who had a predecessor with that identifier is now our new successor
+  // But what if two consecutive nodes fail then this wouldnt work in some cases (unless?)
+
+  // ANOTHER WAY (not sure if this'll work but it should): add 1 to our successor's
+  // identifier and inquire about this identifier. The node that stores this iden is our
+  // new successor but how to find this out? No 'in between' if our successor fails.
+  // Using simple identifier subtraction can solve this.
+
+  // send it to the first alive node in the finger table. that node keeps sending it to the predecessor
+  // till the predecessor is a dead node (might be the same dead node if only one node died but it may well be a different one)
+  // this node with no living predecessor is now our new successor so this node should send a reply back- all well?
+  // BUT we need to be able to detect a dead predecessor for this to work (send acks for with every _heartbeat msg?)
+  // Think
+
+  for _, addr := range ftab {
+    msg := CommandMessage{"_proposal", myAddr, addr, position, strconv.FormatInt(identifier, 10)}
+    buf := getJSONBytes(msg)
+    sendMessage(addr, buf)
+  }
+
+  // also send to predecessor(?)
+  msg := CommandMessage{"_proposal", myAddr, predecessorAddr, position, strconv.FormatInt(identifier, 10)}
+  buf := getJSONBytes(msg)
+  sendMessage(predecessorAddr, buf)
+
 }
 
 func locatePredecessor(conn net.Conn) {
@@ -311,8 +401,6 @@ func sendToNextBestNode(KeyIdentifier int64, msg CommandMessage) {
 }
 
 func sendMessage(addr string, msg []byte) {
-  //tcpAddr, err := net.ResolveTCPAddr("tcp", addr)
-  //checkError(err)
   //fmt.Println("Dialing to send message...")
   //fmt.Println("Address to dial: ", addr)
   fmt.Println("Sending Message: ", string(msg))
@@ -387,7 +475,9 @@ func startUpSystem(nodeAddr string) {
   serverAddr, err := net.ResolveUDPAddr("udp", nodeAddr)
   checkError(err)
 
-  go handleHeartbeats()
+  go handlePredecessorHeartbeats()
+  go handleSuccessorHeartbeats()
+  
 
   fmt.Println("Trying to listen on: ", serverAddr)
   conn, err := net.ListenUDP("udp", serverAddr)
@@ -410,16 +500,58 @@ func startUpSystem(nodeAddr string) {
     //checkError(err)
 
     switch msg.Cmd {
+      case "_proposal":
+        if msg.Key == "successor" && predecessor == -1 {
+          // send a message 
+          responseMsg := CommandMessage{"_resProposal", myAddr, msg.SourceAddr, "successor", strconv.FormatInt(identifier, 10)}
+          b := getJSONBytes(responseMsg)
+          sendMessage(msg.SourceAddr, b)
+        } else if predecessor != -1 && predecessorAddr != "" {
+          // i have a predecessor, send message to my predecessor, passing along the chain till a node with no predecessor
+          b := getJSONBytes(msg)
+          sendMessage(predecessorAddr, b)
+        }
+      case "_resProposal":
+        if msg.Key == "successor" && successor == -1 {
+          successor, _ = strconv.ParseInt(msg.Val, 10, 64)
+          successorAddr = msg.SourceAddr
+          fmt.Println("Found new successor with address: ", successorAddr)
+          // send a positive msg back so it knows we accepted proposal and it sets its predecessor
+          responseMsg := CommandMessage{"_resProposal", myAddr, msg.SourceAddr, "predecessor", strconv.FormatInt(identifier, 10)}
+          b := getJSONBytes(responseMsg)
+          sendMessage(msg.SourceAddr, b)
+        } else if msg.Key == "predecessor" && predecessor == -1 {
+          predecessor, _ = strconv.ParseInt(msg.Val, 10, 64)
+          predecessorAddr = msg.SourceAddr
+          fmt.Println("Found new predecessor with address: ", predecessorAddr)
+          // PROBABLY WONT NEED THIS STEP FOR ONE WAY STABILIZATION
+          // send a positive msg back so it knows we accepted proposal and it sets its successor if needed
+          responseMsg := CommandMessage{"_resProposal", myAddr, msg.SourceAddr, "successor", strconv.FormatInt(identifier, 10)}
+          b := getJSONBytes(responseMsg)
+          sendMessage(msg.SourceAddr, b)
+        } else {
+          fmt.Println("Response proposal message discarded")
+        }
       case "_heartbeat":
         if msg.SourceAddr == successorAddr {
           // successor is still alive so all good
-          aliveChan <- true
+          fmt.Println("SUCCESSOR ALIVE!")
+          successorAliveChannel <- true
+        }
+        if msg.SourceAddr == predecessorAddr {
+          // predecessor is still alive so all good
+          fmt.Println("PREDECESSOR ALIVE!")
+          predecessorAliveChannel <- true
         }
       case "_alive?":
         // received an alive query - send back message to tell I'm still here
         if predecessorAddr == msg.SourceAddr {
-          sendAliveMessage()
+          sendAliveMessage(predecessorAddr)
+        } else if successorAddr == msg.SourceAddr {
+          sendAliveMessage(successorAddr)
         } else {
+            fmt.Println("successorAddr: ", successorAddr)
+            fmt.Println("predecessorAddr: ", predecessorAddr)
             fmt.Println("Received alive query from an unexpected node with addr: ", msg.SourceAddr)
         }     
       case "_getInfo":
@@ -465,6 +597,7 @@ func startUpSystem(nodeAddr string) {
         }
       case "_resLocPred":
         // key in this case would hold asking node's identifier
+        predecessor, _ = strconv.ParseInt(msg.Key, 10, 64)
         predecessorAddr = msg.Val;
         fmt.Println("Updated predecessor to: ", predecessorAddr)
       case "_resDisc" :
@@ -492,7 +625,9 @@ func startUpSystem(nodeAddr string) {
           predecessorAddr = msg.SourceAddr
           break
         }
-        if nodeIdentifier >= identifier && nodeIdentifier <= successor {
+        //nodeIdentifier >= identifier && nodeIdentifier <= successor
+        //func betweenIdens(suc int64, me int64, iden int64) bool
+        if betweenIdens(successor, identifier, nodeIdentifier) {
           // incoming node belongs between this node and its current successor
           // Update current successor's pred to new node
           sendPredInfo(successorAddr, msg.SourceAddr)
@@ -555,6 +690,12 @@ func connectToSystem(nodeAddr string, startAddr string) {
   //listenForControlMessages(nodeAddr)
 }
 
+func getJSONBytes(message CommandMessage) []byte {
+  resp, err := json.Marshal(message)
+  checkError(err)
+  return []byte(resp)
+}
+
 /* The main function.
  */
 func main() {
@@ -572,12 +713,17 @@ func main() {
     store = make(map[string]string)
     ftab = make(map[int64]string)
     m = 3
+
     successor = -1
     successorAddr = ""
+    predecessor = -1
+    predecessorAddr = ""
+
     c = make(chan string)
     identifier = getIdentifier(myAddr)
 
-    aliveChan = make(chan bool, 1)
+    successorAliveChannel = make(chan bool, 1)
+    predecessorAliveChannel = make(chan bool, 1)
     //timeout = make(chan bool, 1)
 
     fmt.Println("THIS NODE'S IDENTIFIER IS: ", identifier)
