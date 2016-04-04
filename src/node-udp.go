@@ -7,33 +7,29 @@ package main
   @date: Mar. 1 2016 - Apr. 11 2016.
 
   Usage:
-    go run node.go [node ip:port] [starter-node ip:port] [-r=replicationFactor] [-t]
+    go run node.go [node ip:port] [starter-node ip:port]
 
     [node ip:port] : this node's ip/port combo
     [starter-node ip:port] : the entry point node's ip/port combo
-    [-r=replicationFactor] : replication factor for Keys, default r = 2
-    [-t] : trace mode for debugging
 
   Copy/paste for quick testing:
-    "go run node.go :0 :6666" <-- trace off, default replication factor (2)
-    "go run node.go :0 :6666 -t -r=5" <-- trace on, r = 5
+    "go run node.go :0 :6666"
 */
 
 import (
   "crypto/sha1"
   "encoding/hex"
   "encoding/json"
-  "flag"
   "fmt"
   "net"
+  "io"
   "os"
   "time"
-  //"sync"
   "math"
   "strconv"
   "math/big"
   "runtime"
-  //"transfile"
+  //"./lib/fileshare"
 )
 
 // =======================================================================
@@ -70,7 +66,7 @@ var predecessorAliveChannel chan bool
 // ======================= Function definitions ==========================
 // =======================================================================
 
-/* 
+/*
 * Checks error value and prints/exits if non nil.
 */
 func checkError(err error) {
@@ -80,7 +76,7 @@ func checkError(err error) {
   }
 }
 
-/* 
+/*
 * Returns the SHA1 hash Value of input key as a string
 */
 func computeSHA1Hash(Key string) string {
@@ -91,11 +87,25 @@ func computeSHA1Hash(Key string) string {
   return str
 }
 
+/* Prints the finger table entries to standard output.
+ */
+func printFingerTable() {
+  fmt.Println(" -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ ")
+  fmt.Printf(" Finger table (unordered) for this node: %d\n", identifier)
+  fmt.Println(" -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ ")
+  fmt.Printf("| ID   |    VAL    |\n")
 
-/* 
+  // Runs up to size m.
+  for id := range ftab {
+    fmt.Printf("| %3d  | %9s |\n", id, ftab[id])
+  }
+  fmt.Println(" -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ ")
+}
+
+/*
 * Send a heartbeat message to let inquiring node know that we're still alive
 */
-func sendAliveMessage(addr string) { 
+func sendAliveMessage(addr string) {
       msg := CommandMessage{"_heartbeat", myAddr, addr, strconv.FormatInt(identifier, 10), myAddr, nil}
       aliveMessage, err := json.Marshal(msg)
       checkError(err)
@@ -103,7 +113,7 @@ func sendAliveMessage(addr string) {
       sendMessage(addr, b)
 }
 
-/* 
+/*
 * Ask a node if it is alive
 */
 func askIfAlive(timeout chan bool, addr string) {
@@ -116,7 +126,7 @@ func askIfAlive(timeout chan bool, addr string) {
     timeout <- true
 }
 
-/* 
+/*
 * Heartbeat handlers which periodically send heartbeat messages to both successor and predecessor
 */
 func handlePredecessorHeartbeats() {
@@ -134,7 +144,7 @@ func handlePredecessorHeartbeats() {
         predecessor = -1
         predecessorAddr = ""
         //stabilizeNode()
-      }     
+      }
       time.Sleep(5 * time.Second)
     } else {
         //fmt.Println("Looping until we have both successor and predecessor")
@@ -157,11 +167,11 @@ func handleSuccessorHeartbeats() {
         // timed out, my successor might be dead. time to make some changes in our secret circle
         fmt.Println("Timed out on successor heartbeat")
         // locate new successor if any
-        // update predecessor of new 
+        // update predecessor of new
         successor = -1
         successorAddr = ""
         stabilizeNode("successor")
-      }     
+      }
       time.Sleep(5 * time.Second)
     } else {
         //fmt.Println("Looping until we have both successor and predecessor")
@@ -170,7 +180,7 @@ func handleSuccessorHeartbeats() {
   }
 }
 
-/* 
+/*
 * Stabilizes a node by finding a new successor. Ran after successor node dies.
 */
 func stabilizeNode(position string) {
@@ -207,7 +217,7 @@ func stabilizeNode(position string) {
 
 }
 
-/* 
+/*
 * Find this node's predecessor
 */
 func locatePredecessor(conn net.Conn) {
@@ -231,7 +241,7 @@ func locateSuccessor(conn net.Conn, id string) {
   checkError(err)
 }
 
-/* 
+/*
 * Inquire a node about where the identifier iden should lie on the Identifier Circle
 */
 func getNodeInfo(nodeAddr string, iden int64) {
@@ -242,7 +252,7 @@ func getNodeInfo(nodeAddr string, iden int64) {
   sendMessage(successorAddr, b)
 }
 
-/* 
+/*
 * Initializes finger table populating entries from iden+2^0 to iden+2^m
 */
 func initFingerTable(conn net.Conn, nodeAddr string) {
@@ -253,7 +263,7 @@ func initFingerTable(conn net.Conn, nodeAddr string) {
   }
 }
 
-/* 
+/*
 * Returns an int64 identifier for an input key
 */
 func getIdentifier(Key string) int64 {
@@ -269,7 +279,7 @@ func getIdentifier(Key string) int64 {
   return ret
 }
 
-/* 
+/*
 * Returns address of node with hash Key by doing a lookup in the finger table
 * Second return value is true if lookup is successful
 * Else returns false as the second return value
@@ -283,7 +293,7 @@ func getVal(Key string) (string, bool) {
   }
 }
 
-/* 
+/*
 * Sends to next best candidate for finding KeyIdentifier by searching through finger table
 */
 func sendToNextBestNode(KeyIdentifier int64, msg CommandMessage) {
@@ -303,7 +313,7 @@ func sendToNextBestNode(KeyIdentifier int64, msg CommandMessage) {
   sendMessage(closestNode, buf)
 }
 
-/* 
+/*
 * Sends a message msg to node with address addr
 */
 func sendMessage(addr string, msg []byte) {
@@ -317,7 +327,7 @@ func sendMessage(addr string, msg []byte) {
   checkError(err)
 }
 
-/* 
+/*
 * Checks if an identifier iden lies between this node and its successor
 */
 func betweenIdens(suc int64, me int64, iden int64) bool {
@@ -335,7 +345,7 @@ func betweenIdens(suc int64, me int64, iden int64) bool {
   return false
 }
 
-/* 
+/*
 * Replies with information about node where the inquired identifier should belong
 * If it can't, sends the message to next best node in finger table
 */
@@ -367,7 +377,7 @@ func provideInfo(msg CommandMessage, nodeAddr string) {
   }
 }
 
-/* 
+/*
 * Sends a message with predecessor info
 */
 func sendPredInfo(src string, succ string) {
@@ -378,7 +388,7 @@ func sendPredInfo(src string, succ string) {
   sendMessage(src, buf)
 }
 
-/* 
+/*
 * Initializes the P2P system
 * Responsible for triggering heartbeat goroutines, backup goroutine and command loop
 */
@@ -391,7 +401,7 @@ func startUpSystem(nodeAddr string) {
   go handleSuccessorHeartbeats()
 
   go maintainBackup()
-  
+
 
   fmt.Println("Trying to listen on: ", serverAddr)
   conn, err := net.ListenUDP("udp", serverAddr)
@@ -422,7 +432,7 @@ func startUpSystem(nodeAddr string) {
         store = msg.Store
       case "_proposal":
         if msg.Key == "successor" && predecessor == -1 {
-          // send a message 
+          // send a message
           responseMsg := CommandMessage{"_resProposal", myAddr, msg.SourceAddr, "successor", strconv.FormatInt(identifier, 10), nil}
           b := getJSONBytes(responseMsg)
           sendMessage(msg.SourceAddr, b)
@@ -475,7 +485,7 @@ func startUpSystem(nodeAddr string) {
             fmt.Println("successorAddr: ", successorAddr)
             fmt.Println("predecessorAddr: ", predecessorAddr)
             fmt.Println("Received alive query from an unexpected node with addr: ", msg.SourceAddr)
-        }     
+        }
       case "_getInfo":
         provideInfo(msg, nodeAddr)
       case "_getVal":
@@ -532,7 +542,7 @@ func startUpSystem(nodeAddr string) {
         nodeIdentifier := getIdentifier(msg.SourceAddr)
         if successor == -1 {
           fmt.Println("No successor in network. Setting now to new node...")
-          ftab[nodeIdentifier] = msg.SourceAddr         
+          ftab[nodeIdentifier] = msg.SourceAddr
           // notify new node of its successor (current successor)
           responseMsg := CommandMessage {"_resDisc", nodeAddr, msg.SourceAddr, "", nodeAddr, nil}
           resMsg, err := json.Marshal(responseMsg)
@@ -569,11 +579,33 @@ func startUpSystem(nodeAddr string) {
           sendToNextBestNode(getIdentifier(msg.SourceAddr), msg)
           break
         }
+      case "_upload": // save file at a node
+        //fileIdentifier := getIdentifier(msg.Key) // the filename is stored in msg.Key
+        //nodeToSaveAt := findClosestNode(fileIdentifier)
+
+        in, err := os.Open(msg.Val)
+        checkError(err)
+        defer in.Close()
+        out, err := os.Create("./Downloads/")
+        checkError(err)
+        defer func() {
+          cerr := out.Close()
+          if err == nil {
+              err = cerr
+          }
+        }()
+        if _, err = io.Copy(out, in); err != nil {
+          // do nothing, successful
+        }
+        err = out.Sync()
+        checkError(err)
+
+      case "_stream": // cycle through the "store" table and return bytes in order, call abrar's f'ns
     }
   }
 }
 
-/* 
+/*
 * Attempt to join the system given the ip:port of a running node.
 */
 func connectToSystem(nodeAddr string, startAddr string) {
@@ -590,9 +622,10 @@ func connectToSystem(nodeAddr string, startAddr string) {
   <-c
 
   initFingerTable(conn, nodeAddr)
+  printFingerTable()
 }
 
-/* 
+/*
 * Returns a json formatted byte array of the input message
 */
 func getJSONBytes(message CommandMessage) []byte {
@@ -601,7 +634,7 @@ func getJSONBytes(message CommandMessage) []byte {
   return []byte(resp)
 }
 
-/* 
+/*
 * Sends message with the whole key value store to node with address addr
 */
 func sendKeyMap(addr string) {
@@ -619,7 +652,7 @@ func getKeyMap(addr string) {
   sendMessage(addr, buf)
 }
 
-/* 
+/*
 * Periodically replicates successor nodes backup to survive loss of data due to node failures
 */
 func maintainBackup() {
@@ -633,20 +666,17 @@ func maintainBackup() {
 
 func main() {
   // Handle the command line.
-  if len(os.Args) > 5 || len(os.Args) < 3 {
-    fmt.Println("Usage: go run node.go [node ip:port] [starter-node ip:port] [-r=replicationFactor] [-t]")
+  if len(os.Args) != 3 {
+    fmt.Println("Usage: go run node.go [node ip:port] [starter-node ip:port]")
     os.Exit(-1)
   } else {
     myAddr = os.Args[1] // ip:port of this node
     startAddr := os.Args[2] // ip:port of initial node
-    flag.IntVar(&replicationFactor, "r", 2, "replication factor")
-    flag.BoolVar(&traceMode, "t", false, "trace mode")
-    flag.Parse()
 
     store = make(map[string]string)
     ftab = make(map[int64]string)
-    m = 3
-
+    m = 7
+    replicationFactor = 1
     successor = -1
     successorAddr = ""
     predecessor = -1

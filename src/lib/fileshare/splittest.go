@@ -12,7 +12,7 @@ type VidSegment struct {
 	Body []byte
 }
 
-func main() {
+func Dummy() {
 	filename := "dummy.txt"
 	num := 4 // replication factor
 
