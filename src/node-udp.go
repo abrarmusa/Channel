@@ -465,6 +465,8 @@ func startUpSystem(nodeAddr string) {
         }
       case "_alive?":
         // received an alive query - send back message to tell I'm still here
+        // ISSUE: if i remove else if (just use if which I should logically), then
+        // I get timeouts (WHY?)
         if predecessorAddr == msg.SourceAddr {
           sendAliveMessage(predecessorAddr)
         } else if successorAddr == msg.SourceAddr {
