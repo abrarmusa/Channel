@@ -11,14 +11,13 @@ import (
 	"strconv"
 )
 
-type StreamNode {
+type StreamNode struct {
 	Name string
 	Address string
 	startSeqNum string
 	numFrames int64
 	Next *StreamNode
 }
-
 type Reply struct {
   Val string
 }
