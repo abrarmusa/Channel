@@ -542,7 +542,7 @@ func startUpSystem(nodeAddr string) {
         nodeIdentifier := getIdentifier(msg.SourceAddr)
         if successor == -1 {
           fmt.Println("No successor in network. Setting now to new node...")
-          ftab[nodeIdentifier] = msg.SourceAddr
+          ftab[nodeIdentifier] = msg.SourceAddr // TODO: PROBLEM
           // notify new node of its successor (current successor)
           responseMsg := CommandMessage {"_resDisc", nodeAddr, msg.SourceAddr, "", nodeAddr, nil}
           resMsg, err := json.Marshal(responseMsg)

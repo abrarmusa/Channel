@@ -1,12 +1,33 @@
-// REQUIRES A LOT OF REFACTORIZATION OFCOURSE
-// NEED TO MAKE FUNCTIONS MORE MODULAR - WITH PARAMS FOR DIFFERENT FILENAMES AND OUTPUT FILENAMES
+// REQUIRES A LOT OF REFACTORIZATION AND CLEANUP
 
 package main
 
 import (
 	"log"
 	"os/exec"
+	"net/rpc"
+	"fmt"
+	"os"
+	"strconv"
 )
+
+type StreamNode {
+	Name string
+	Address string
+	startSeqNum string
+	numFrames int64
+	Next *StreamNode
+}
+
+type Reply struct {
+  Val string
+}
+type Msg struct {
+  Id int64
+  Val string
+}
+var nodeAddr string
+type NodeRPCService int
 
 func getStream() {
 	// ffplay udp://127.0.0.1:1234
@@ -21,8 +42,45 @@ func getStream() {
 }
 
 func main() {
-	getStream()
+	nodeRPCHandler0, err := rpc.Dial("tcp", ":1345")
+	checkError(err)
+	defer nodeRPCHandler0.Close()
+
+	nodeRPCHandler1, err := rpc.Dial("tcp", ":1245")
+	checkError(err)
+	defer nodeRPCHandler1.Close()
+	go getStream()
+
+	for i := 1 ; i < 500; i += 299 {
+		startFrame := strconv.FormatInt(int64(i), 10)
+		msg := Msg {1, startFrame}
+		var reply Reply
+		if i == 1 {
+			err = nodeRPCHandler0.Call("NodeRPCService.StartStreaming", &msg, &reply)
+		} else {
+			err = nodeRPCHandler1.Call("NodeRPCService.StartStreaming", &msg, &reply)
+		}
+	    checkError(err)
+	    fmt.Println("Reply received: ", reply.Val)
+	}
+
+	// msg := Msg {1, "0"}
+	// var reply Reply
+	// err = nodeRPCHandler.Call("NodeRPCService.StartStreaming", &msg, &reply) // returns id in msg.Id, and ip:port in msg.Val
+	 //    checkError(err)
+	 //    fmt.Println("Reply received: ", reply.Val)
 }
+
+func checkError(err error) {
+	if err != nil {
+		fmt.Println("Error: ", err)
+		os.Exit(-1)
+	}
+}
+
+
+
+
 
 
 
