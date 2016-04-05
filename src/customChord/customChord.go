@@ -1,4 +1,4 @@
-package main
+package customChord
 
 /*
   UBC CS416 Distributed Systems Project Source Code
@@ -666,14 +666,14 @@ func maintainBackup() {
   }
 }
 
-func main() {
+func Start(thisAddr string, startNodeAddr string) {
   // Handle the command line.
-  if len(os.Args) != 3 {
-    fmt.Println("Usage: go run node.go [node ip:port] [starter-node ip:port]")
-    os.Exit(-1)
-  } else {
-    myAddr = os.Args[1] // ip:port of this node
-    startAddr := os.Args[2] // ip:port of initial node
+  //if len(os.Args) != 3 {
+  //  fmt.Println("Usage: go run node.go [node ip:port] [starter-node ip:port]")
+  //  os.Exit(-1)
+  //} else {
+    myAddr = thisAddr // ip:port of this node
+    startAddr := startNodeAddr // ip:port of initial node
 
     store = make(map[string]string)
     ftab = make(map[int64]string)
@@ -699,7 +699,7 @@ func main() {
         go startUpSystem(myAddr)
         go connectToSystem(myAddr, startAddr)
     }
-  }
+  //}
   for {
     runtime.Gosched()
   }
