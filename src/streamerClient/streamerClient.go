@@ -1,6 +1,4 @@
-// REQUIRES A LOT OF REFACTORIZATION AND CLEANUP
-
-package main
+package streamerClient
 
 import (
 	"log"
@@ -8,7 +6,6 @@ import (
 	"net/rpc"
 	"fmt"
 	"os"
-	"strconv"
 )
 
 type StreamNode struct {
@@ -28,46 +25,33 @@ type Msg struct {
 var nodeAddr string
 type NodeRPCService int
 
-func getStream() {
+func ListenForStream(addr string) {
 	// ffplay udp://127.0.0.1:1234
-	cmd := exec.Command("ffplay", "udp://127.0.0.1:1234")
-	err := cmd.Start()
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Printf("Waiting to get stream...")
-	err = cmd.Wait()
-	log.Printf("Getting stream finished with error: %v", err)
+	go func() {
+		cmd := exec.Command("ffplay", addr)
+		err := cmd.Start()
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("Waiting to get stream...")
+		err = cmd.Wait()
+		log.Printf("Getting stream finished with error: %v", err)
+	}()
 }
 
-func main() {
-	nodeRPCHandler0, err := rpc.Dial("tcp", ":1345")
+func GetRpcHandler(rpcAddr string) (*rpc.Client) {
+	nodeRPCHandler, err := rpc.Dial("tcp", rpcAddr)
 	checkError(err)
-	defer nodeRPCHandler0.Close()
+	//defer nodeRPCHandler.Close()
+	return nodeRPCHandler
+}
 
-	nodeRPCHandler1, err := rpc.Dial("tcp", ":1245")
+func StartStreaming(handler *rpc.Client, iden int64, startFrame string) {
+	msg := Msg {iden, startFrame}
+	var reply Reply
+	err := handler.Call("NodeRPCService.StartStreaming", &msg, &reply) // returns id in msg.Id, and ip:port in msg.Val
 	checkError(err)
-	defer nodeRPCHandler1.Close()
-	go getStream()
-
-	for i := 1 ; i < 500; i += 299 {
-		startFrame := strconv.FormatInt(int64(i), 10)
-		msg := Msg {1, startFrame}
-		var reply Reply
-		if i == 1 {
-			err = nodeRPCHandler0.Call("NodeRPCService.StartStreaming", &msg, &reply)
-		} else {
-			err = nodeRPCHandler1.Call("NodeRPCService.StartStreaming", &msg, &reply)
-		}
-	    checkError(err)
-	    fmt.Println("Reply received: ", reply.Val)
-	}
-
-	// msg := Msg {1, "0"}
-	// var reply Reply
-	// err = nodeRPCHandler.Call("NodeRPCService.StartStreaming", &msg, &reply) // returns id in msg.Id, and ip:port in msg.Val
-	 //    checkError(err)
-	 //    fmt.Println("Reply received: ", reply.Val)
+	fmt.Println("Reply received: ", reply.Val)
 }
 
 func checkError(err error) {

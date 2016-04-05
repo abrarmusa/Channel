@@ -184,6 +184,8 @@ func handleSuccessorHeartbeats() {
 * Stabilizes a node by finding a new successor. Ran after successor node dies.
 */
 func stabilizeNode(position string) {
+  // SCRATCH WORK:
+  
   // ONE SIMPLE WAY: inquire about our failed successors identifier
   // A node who had a predecessor with that identifier is now our new successor
   // But what if two consecutive nodes fail then this wouldnt work in some cases (unless?)
