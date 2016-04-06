@@ -48,3 +48,9 @@ func Help() {
 	colorprint.Blue("    3. 'list' - lists all the available commands")
 	colorprint.Warning(">>>>----------------------------------------------------------------------------------<<<<")
 }
+
+func ProgressBar(progstr string, counter int, downloadstr int, segNums int) int {
+	progress := ((counter * 100) / int(segNums))
+	fmt.Printf("\rDownload Speed: %.1f MB/s [%s]  - %d%%", float64(downloadstr)/float64(consts.Bytecount), progstr, progress)
+	return 0
+}
