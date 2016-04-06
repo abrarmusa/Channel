@@ -43,6 +43,7 @@ type CommandMessage struct {
   Key string
   Val string
   Store map[string]string
+  Type string
 }
 
 var traceMode bool
@@ -59,8 +60,12 @@ var m float64
 var c chan string
 var myAddr string
 
+var streamServerAddress string
+var streamClientAddress string
+
 var successorAliveChannel chan bool
 var predecessorAliveChannel chan bool
+var streamServerChannel chan string
 
 // =======================================================================
 // ======================= Function definitions ==========================
@@ -106,7 +111,7 @@ func printFingerTable() {
 * Send a heartbeat message to let inquiring node know that we're still alive
 */
 func sendAliveMessage(addr string) {
-      msg := CommandMessage{"_heartbeat", myAddr, addr, strconv.FormatInt(identifier, 10), myAddr, nil}
+      msg := CommandMessage{"_heartbeat", myAddr, addr, strconv.FormatInt(identifier, 10), myAddr, nil, ""}
       aliveMessage, err := json.Marshal(msg)
       checkError(err)
       b := []byte(aliveMessage)
@@ -117,7 +122,7 @@ func sendAliveMessage(addr string) {
 * Ask a node if it is alive
 */
 func askIfAlive(timeout chan bool, addr string) {
-    msg := CommandMessage{"_alive?", myAddr, addr, strconv.FormatInt(identifier, 10), myAddr, nil}
+    msg := CommandMessage{"_alive?", myAddr, addr, strconv.FormatInt(identifier, 10), myAddr, nil, ""}
     aliveMessage, err := json.Marshal(msg)
     checkError(err)
     b := []byte(aliveMessage)
@@ -207,13 +212,13 @@ func stabilizeNode(position string) {
   // a node dies - may change later
 
   for _, addr := range ftab {
-    msg := CommandMessage{"_proposal", myAddr, addr, position, strconv.FormatInt(identifier, 10), nil}
+    msg := CommandMessage{"_proposal", myAddr, addr, position, strconv.FormatInt(identifier, 10), nil, ""}
     buf := getJSONBytes(msg)
     sendMessage(addr, buf)
   }
 
   // also send to predecessor(?)
-  msg := CommandMessage{"_proposal", myAddr, predecessorAddr, position, strconv.FormatInt(identifier, 10), nil}
+  msg := CommandMessage{"_proposal", myAddr, predecessorAddr, position, strconv.FormatInt(identifier, 10), nil, ""}
   buf := getJSONBytes(msg)
   sendMessage(predecessorAddr, buf)
 
@@ -223,7 +228,7 @@ func stabilizeNode(position string) {
 * Find this node's predecessor
 */
 func locatePredecessor(conn net.Conn) {
-  msg := CommandMessage{"_locPred", myAddr, "", strconv.FormatInt(identifier, 10), "", nil}
+  msg := CommandMessage{"_locPred", myAddr, "", strconv.FormatInt(identifier, 10), "", nil, ""}
   msgInJSON, err := json.Marshal(msg)
   checkError(err)
   buf := []byte(msgInJSON)
@@ -235,7 +240,7 @@ func locatePredecessor(conn net.Conn) {
 * Find this node's successor
 */
 func locateSuccessor(conn net.Conn, id string) {
-  msg := CommandMessage{"_discover", id, "", "", "", nil}
+  msg := CommandMessage{"_discover", id, "", "", "", nil, ""}
   msgInJSON, err := json.Marshal(msg)
   checkError(err)
   buf := []byte(msgInJSON)
@@ -247,7 +252,7 @@ func locateSuccessor(conn net.Conn, id string) {
 * Inquire a node about where the identifier iden should lie on the Identifier Circle
 */
 func getNodeInfo(nodeAddr string, iden int64) {
-  msg := CommandMessage{"_getInfo", nodeAddr, "", "", strconv.FormatInt(iden, 10), nil}
+  msg := CommandMessage{"_getInfo", nodeAddr, "", "", strconv.FormatInt(iden, 10), nil, ""}
   jsonMsg, err := json.Marshal(msg)
   checkError(err)
   b := []byte(jsonMsg)
@@ -321,9 +326,14 @@ func sendToNextBestNode(KeyIdentifier int64, msg CommandMessage) {
 func sendMessage(addr string, msg []byte) {
   //fmt.Println("Dialing to send message...")
   //fmt.Println("Address to dial: ", addr)
+  if addr == "" {
+    // send to self(?) for now - testing streaming
+    sendMessage(myAddr, msg)
+  }
   fmt.Println("Sending Message: ", string(msg))
   conn, err := net.Dial("udp", addr)
   checkError(err)
+
   defer conn.Close()
   _, err = conn.Write(msg)
   checkError(err)
@@ -351,24 +361,24 @@ func betweenIdens(suc int64, me int64, iden int64) bool {
 * Replies with information about node where the inquired identifier should belong
 * If it can't, sends the message to next best node in finger table
 */
-func provideInfo(msg CommandMessage, nodeAddr string) {
+func provideInfo(msg CommandMessage, nodeAddr string, forType string) {
   iden, err := strconv.ParseInt(msg.Val, 10, 64)
   checkError(err)
   if betweenIdens(successor, identifier, iden) {
-    reply := CommandMessage{"_resInfo", nodeAddr, msg.SourceAddr, msg.Val, successorAddr, nil}
+    reply := CommandMessage{"_resInfo", nodeAddr, msg.SourceAddr, msg.Val, successorAddr, nil, forType}
     jsonReply, err := json.Marshal(reply)
     checkError(err)
     b := []byte(jsonReply)
     sendMessage(msg.SourceAddr, b)
   } else if identifier == iden {
     // heloo.. is it me you're looking for
-    reply := CommandMessage{"_resInfo", nodeAddr, msg.SourceAddr, msg.Val, nodeAddr, nil}
+    reply := CommandMessage{"_resInfo", nodeAddr, msg.SourceAddr, msg.Val, nodeAddr, nil, forType}
     jsonReply, err := json.Marshal(reply)
     checkError(err)
     b := []byte(jsonReply)
     sendMessage(msg.SourceAddr, b)
   } else if val, ok := ftab[iden]; ok {
-    reply := CommandMessage{"_resInfo", nodeAddr, msg.SourceAddr, msg.Val, val, nil}
+    reply := CommandMessage{"_resInfo", nodeAddr, msg.SourceAddr, msg.Val, val, nil, forType}
     jsonReply, err := json.Marshal(reply)
     checkError(err)
     b := []byte(jsonReply)
@@ -383,7 +393,7 @@ func provideInfo(msg CommandMessage, nodeAddr string) {
 * Sends a message with predecessor info
 */
 func sendPredInfo(src string, succ string) {
-  responseMsg := CommandMessage{"_resLocPred", myAddr, src, "predecessor", succ, nil}
+  responseMsg := CommandMessage{"_resLocPred", myAddr, src, "predecessor", succ, nil, ""}
   resp, err := json.Marshal(responseMsg)
   checkError(err)
   buf := []byte(resp)
@@ -423,6 +433,12 @@ func startUpSystem(nodeAddr string) {
     //checkError(err)
 
     switch msg.Cmd {
+      case "_stream":
+        msg := CommandMessage{"_resStream", myAddr, msg.SourceAddr, "Stream Server Address", streamServerAddress, nil, msg.Type}
+        b := getJSONBytes(msg)
+        sendMessage(msg.SourceAddr, b)
+      case "_resStream":
+        streamServerChannel <- msg.Val
       case "_storeBackup":
         sendKeyMap(msg.SourceAddr)
       case "_resStoreBackup":
@@ -435,7 +451,7 @@ func startUpSystem(nodeAddr string) {
       case "_proposal":
         if msg.Key == "successor" && predecessor == -1 {
           // send a message
-          responseMsg := CommandMessage{"_resProposal", myAddr, msg.SourceAddr, "successor", strconv.FormatInt(identifier, 10), nil}
+          responseMsg := CommandMessage{"_resProposal", myAddr, msg.SourceAddr, "successor", strconv.FormatInt(identifier, 10), nil, ""}
           b := getJSONBytes(responseMsg)
           sendMessage(msg.SourceAddr, b)
         } else if predecessor != -1 && predecessorAddr != "" {
@@ -449,7 +465,7 @@ func startUpSystem(nodeAddr string) {
           successorAddr = msg.SourceAddr
           fmt.Println("Found new successor with address: ", successorAddr)
           // send a positive msg back so it knows we accepted proposal and it sets its predecessor
-          responseMsg := CommandMessage{"_resProposal", myAddr, msg.SourceAddr, "predecessor", strconv.FormatInt(identifier, 10), nil}
+          responseMsg := CommandMessage{"_resProposal", myAddr, msg.SourceAddr, "predecessor", strconv.FormatInt(identifier, 10), nil, ""}
           b := getJSONBytes(responseMsg)
           sendMessage(msg.SourceAddr, b)
         } else if msg.Key == "predecessor" && predecessor == -1 {
@@ -458,7 +474,7 @@ func startUpSystem(nodeAddr string) {
           fmt.Println("Found new predecessor with address: ", predecessorAddr)
           // PROBABLY WONT NEED THIS STEP FOR ONE WAY STABILIZATION
           // send a positive msg back so it knows we accepted proposal and it sets its successor if needed
-          responseMsg := CommandMessage{"_resProposal", myAddr, msg.SourceAddr, "successor", strconv.FormatInt(identifier, 10), nil}
+          responseMsg := CommandMessage{"_resProposal", myAddr, msg.SourceAddr, "successor", strconv.FormatInt(identifier, 10), nil, ""}
           b := getJSONBytes(responseMsg)
           sendMessage(msg.SourceAddr, b)
         } else {
@@ -489,12 +505,12 @@ func startUpSystem(nodeAddr string) {
             fmt.Println("Received alive query from an unexpected node with addr: ", msg.SourceAddr)
         }
       case "_getInfo":
-        provideInfo(msg, nodeAddr)
+        provideInfo(msg, nodeAddr, "ftab")
       case "_getVal":
         v, haveKey := getVal(msg.Key)
         if haveKey {
           // respond with Value
-          responseMsg := CommandMessage{"_resVal", nodeAddr, msg.SourceAddr, msg.Key, v, nil}
+          responseMsg := CommandMessage{"_resVal", nodeAddr, msg.SourceAddr, msg.Key, v, nil, ""}
           resp, err := json.Marshal(responseMsg)
           checkError(err)
           buf = []byte(resp)
@@ -505,14 +521,19 @@ func startUpSystem(nodeAddr string) {
           sendToNextBestNode(k, msg)
         }
       case "_resInfo":
-        ftab[k] = msg.Val
-        fmt.Println("Set finger table entry ", msg.Key, " to ", ftab[k])
+        if msg.Type == "ftab" {
+          ftab[k] = msg.Val
+          fmt.Println("Set finger table entry ", msg.Key, " to ", ftab[k])
+        } else if msg.Type == "streamServer" {
+          fmt.Println("Received address of chordNode for streaming: ", msg.Val)
+          streamServerChannel <- msg.Val
+        }
       case "_setVal":
         _, haveKey := getVal(msg.Key)
         if haveKey {
           // change Value
           store[msg.Key] = msg.Val
-          responseMsg := CommandMessage{"_resGen", nodeAddr, msg.SourceAddr, "", "Key Updated", nil}
+          responseMsg := CommandMessage{"_resGen", nodeAddr, msg.SourceAddr, "", "Key Updated", nil, ""}
           resp, err := json.Marshal(responseMsg)
           checkError(err)
           buf = []byte(resp)
@@ -546,7 +567,7 @@ func startUpSystem(nodeAddr string) {
           fmt.Println("No successor in network. Setting now to new node...")
           ftab[nodeIdentifier] = msg.SourceAddr // TODO: PROBLEM
           // notify new node of its successor (current successor)
-          responseMsg := CommandMessage {"_resDisc", nodeAddr, msg.SourceAddr, "", nodeAddr, nil}
+          responseMsg := CommandMessage {"_resDisc", nodeAddr, msg.SourceAddr, "", nodeAddr, nil, ""}
           resMsg, err := json.Marshal(responseMsg)
           checkError(err)
           buf := []byte(resMsg)
@@ -567,7 +588,7 @@ func startUpSystem(nodeAddr string) {
           fmt.Println("New node fits between me and my successor. Updating finger table...")
           ftab[nodeIdentifier] = msg.SourceAddr
           // notify new node of its successor (current successor)
-          responseMsg := CommandMessage {"_resDisc", nodeAddr, msg.SourceAddr, "", successorAddr, nil}
+          responseMsg := CommandMessage {"_resDisc", nodeAddr, msg.SourceAddr, "", successorAddr, nil, ""}
           resMsg, err := json.Marshal(responseMsg)
           checkError(err)
           buf := []byte(resMsg)
@@ -601,8 +622,6 @@ func startUpSystem(nodeAddr string) {
         }
         err = out.Sync()
         checkError(err)
-
-      case "_stream": // cycle through the "store" table and return bytes in order, call abrar's f'ns
     }
   }
 }
@@ -640,7 +659,7 @@ func getJSONBytes(message CommandMessage) []byte {
 * Sends message with the whole key value store to node with address addr
 */
 func sendKeyMap(addr string) {
-  msg := CommandMessage{"_resStoreBackup", myAddr, addr, "", "", store}
+  msg := CommandMessage{"_resStoreBackup", myAddr, addr, "", "", store, ""}
   buf := getJSONBytes(msg)
   sendMessage(addr, buf)
 }
@@ -649,7 +668,7 @@ func sendKeyMap(addr string) {
 * Sends a message which requests a node's kv store
 */
 func getKeyMap(addr string) {
-  msg := CommandMessage{"_storeBackup", myAddr, addr, "", "", nil}
+  msg := CommandMessage{"_storeBackup", myAddr, addr, "", "", nil, ""}
   buf := getJSONBytes(msg)
   sendMessage(addr, buf)
 }
@@ -666,7 +685,27 @@ func maintainBackup() {
   }
 }
 
-func Start(thisAddr string, startNodeAddr string) {
+func GetStreamingServer(filename string) string {
+  if successorAddr == "" && predecessorAddr == "" {
+    // no one else in the system
+    return streamServerAddress
+  }
+  iden := getIdentifier(filename)
+  getNodeInfo(myAddr, iden)
+  addr := <- streamServerChannel
+  fmt.Println("Address of chord node which will stream: ", addr)
+
+  // now ask the node to prepare stream for this node
+  msg := CommandMessage{"_stream", myAddr, addr, "", streamClientAddress, nil, "streamServer"}
+  b := getJSONBytes(msg)
+  sendMessage(addr, b)
+
+  addr = <- streamServerChannel
+  fmt.Println("Address of streaming server: ", addr)
+  return addr
+}
+
+func Start(thisAddr string, startNodeAddr string, ssa string, sca string) {
   // Handle the command line.
   //if len(os.Args) != 3 {
   //  fmt.Println("Usage: go run node.go [node ip:port] [starter-node ip:port]")
@@ -674,6 +713,8 @@ func Start(thisAddr string, startNodeAddr string) {
   //} else {
     myAddr = thisAddr // ip:port of this node
     startAddr := startNodeAddr // ip:port of initial node
+    streamServerAddress = ssa
+    streamClientAddress = sca
 
     store = make(map[string]string)
     ftab = make(map[int64]string)
@@ -689,6 +730,7 @@ func Start(thisAddr string, startNodeAddr string) {
 
     successorAliveChannel = make(chan bool, 1)
     predecessorAliveChannel = make(chan bool, 1)
+    streamServerChannel = make(chan string, 1)
 
     fmt.Println("THIS NODE'S IDENTIFIER IS: ", identifier)
 

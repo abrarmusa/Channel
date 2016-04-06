@@ -461,7 +461,6 @@ func main() {
 
 			os.Exit(-1)
 		}
-		fmt.Println("dadad")
 		go setUpRPC(nodeRPC)
 		Instr(nodeRPC, nodeUDP)
 

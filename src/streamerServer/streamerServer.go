@@ -5,6 +5,8 @@ import (
 	"net/rpc"
 	"log"
 	"os/exec"
+	"bytes"
+	"fmt"
 )
 
 type Reply struct {
@@ -13,6 +15,7 @@ type Reply struct {
 type Msg struct {
   Id int64
   Val string
+  Address string
 }
 
 var nodeAddr string
@@ -21,12 +24,27 @@ var dest string
 type NodeRPCService int
 
 func (this *NodeRPCService) StartStreaming(msg *Msg, reply *Reply) error {
+	// "udp://127.0.0.1:1234"
+	addr := "udp://127.0.0.1" + msg.Address
 	cmd := exec.Command("ffmpeg", "-start_number", msg.Val, "-re", "-i", dest, "-r", "10", 
-	"-vcodec", "mpeg4", "-f", "mpegts",  "udp://127.0.0.1:1234")
+	"-vcodec", "mpeg4", "-f", "mpegts", addr)
+
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
 	err := cmd.Start()
-	checkError(err)
+
+	if err != nil {
+    	fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+    	return err
+	}
+	//fmt.Println("Result: " + out.String())
+
+	//checkError(err)
 	log.Printf("Waiting to start streaming frames...")
 	err = cmd.Wait()
+	//fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
 	log.Printf("Frame streaming finished with error: %v", err)
 	reply.Val = "ok"
 	return nil
@@ -72,7 +90,7 @@ func Start(rpcServerAddr string, name string) {
 
 	dest = "FFMPEG/NodesData/" + nodeName + "/output/%05d.png"
 	//getFrames(dest)
-
+	log.Println("Launching rpc service to serve stream requests...")
 	launchRPCService(nodeAddr)
 }
 

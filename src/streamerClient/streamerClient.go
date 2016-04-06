@@ -21,6 +21,7 @@ type Reply struct {
 type Msg struct {
   Id int64
   Val string
+  Address string
 }
 var nodeAddr string
 type NodeRPCService int
@@ -40,14 +41,17 @@ func ListenForStream(addr string) {
 }
 
 func GetRpcHandler(rpcAddr string) (*rpc.Client) {
+	//var err error
+	var nodeRPCHandler *rpc.Client
 	nodeRPCHandler, err := rpc.Dial("tcp", rpcAddr)
+	
 	checkError(err)
 	//defer nodeRPCHandler.Close()
 	return nodeRPCHandler
 }
 
-func StartStreaming(handler *rpc.Client, iden int64, startFrame string) {
-	msg := Msg {iden, startFrame}
+func StartStreaming(handler *rpc.Client, iden int64, startFrame string, addr string) {
+	msg := Msg {iden, startFrame, addr}
 	var reply Reply
 	err := handler.Call("NodeRPCService.StartStreaming", &msg, &reply) // returns id in msg.Id, and ip:port in msg.Val
 	checkError(err)
