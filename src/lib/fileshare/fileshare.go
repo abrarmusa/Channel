@@ -556,20 +556,6 @@ func FileSysStart(nodeRPC string) {
 	progLock = &sync.RWMutex{}
 	processLocalVideosIntoFileSys()
 	// ========================================
-<<<<<<< HEAD
 	go setUpRPC(nodeRPC)
 	Instr(nodeRPC)
-=======
-	if len(os.Args) == 3 {
-		nodeRPC := os.Args[1]
-		nodeUDP := os.Args[2]
-		if !utility.ValidIP(nodeRPC, "[node RPC ip:port]") || !utility.ValidIP(nodeUDP, "[node UDP ip:port]") {
-
-			os.Exit(-1)
-		}
-		go setUpRPC(nodeRPC)
-		Instr(nodeRPC, nodeUDP)
-
-	}
->>>>>>> 4701478d15c5ceb7c7cb046548b565a0f8a2f319
 }
