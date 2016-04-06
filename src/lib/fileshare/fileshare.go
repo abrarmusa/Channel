@@ -557,5 +557,4 @@ func FileSysStart(nodeRPC string) {
 	processLocalVideosIntoFileSys()
 	// ========================================
 	go setUpRPC(nodeRPC)
-	Instr(nodeRPC)
 }
