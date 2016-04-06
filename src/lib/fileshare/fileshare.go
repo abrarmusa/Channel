@@ -348,7 +348,7 @@ func writeToFileHelper(fname string, video utility.Video) string {
 // This method loads up a local json file to see which files are available in the local file system. Once
 // the read has been completed, the files are then processed into the utility.utility.FileSys map accordingly
 func processLocalVideosIntoFileSys() {
-	locFiles, err := ioutil.ReadFile(consts.DirPath + "/localFiles.json")
+	locFiles, err := ioutil.ReadFile("../filesys/localFiles.json")
 	utility.CheckError(err)
 	files := make([]utility.File, 0)
 
@@ -556,6 +556,20 @@ func FileSysStart(nodeRPC string) {
 	progLock = &sync.RWMutex{}
 	processLocalVideosIntoFileSys()
 	// ========================================
+<<<<<<< HEAD
 	go setUpRPC(nodeRPC)
 	Instr(nodeRPC)
+=======
+	if len(os.Args) == 3 {
+		nodeRPC := os.Args[1]
+		nodeUDP := os.Args[2]
+		if !utility.ValidIP(nodeRPC, "[node RPC ip:port]") || !utility.ValidIP(nodeUDP, "[node UDP ip:port]") {
+
+			os.Exit(-1)
+		}
+		go setUpRPC(nodeRPC)
+		Instr(nodeRPC, nodeUDP)
+
+	}
+>>>>>>> 4701478d15c5ceb7c7cb046548b565a0f8a2f319
 }

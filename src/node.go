@@ -1,5 +1,4 @@
 package main
-
 /*
   UBC CS416 Distributed Systems Project Source Code
 
@@ -7,57 +6,48 @@ package main
   @date: Mar. 1 2016 - Apr. 11 2016.
 
   Usage:
-    go run node.go [node ip:port] [starter-node ip:port] [m size] [-r=replicationFactor] [-t]"
+    go run node.go [node ip:port] [starter-node ip:port]"
 
     [node ip:port] : this node's ip/port combo
     [starter-node ip:port] : the entry point node's ip/port combo
-    [m size] : 2^m circle size of the system
-    [-r=replicationFactor] : replication factor for Keys, default r = 2
-    [-t] : trace mode for debugging
 
   Copy/paste for quick testing:
-    "go run node.go :0 :6666 7" <-- trace off, default replication factor (2)
-    "go run node.go :0 :6666 7 -t -r=5" <-- trace on, r = 5
+    "go run node.go :6666 :6666" <- start up system at :6666
+    "go run node.go :0 :6666" <- connect to node listening at :6666
 */
 
 import (
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"math"
 	"math/big"
 	"net"
+  "net/rpc"
 	"os"
-	"strconv"
+  "sort"
 	"sync"
 	"time"
 )
 
 // =======================================================================
-// ====================== Global variables/types =========================
+// ====================== Global Variables/Types =========================
 // =======================================================================
 // Some types used for RPC communication.
-type nodeRPCService int
-type CommandMessage struct {
-	Cmd        string
-	SourceAddr string
-	DestAddr   string
-	Key        string
-	Val        string
+type Reply struct {
+  Val string
 }
+type Msg struct {
+  Id int64
+  Val string
+}
+type NodeRPCService int
 
-// Some static command line options.
-var KRED string = "\x1B[35m"
-var traceMode bool
+// Some static variables.
+var myIdentifier int64
 var replicationFactor int
 var m float64
-var store map[string]string
-var ftab map[int64]string
-var successor int64
-var successorAddr string
-var identifier int64
 
 // The finger table.
 var fingerLocker = struct {
@@ -68,277 +58,338 @@ var fingerLocker = struct {
 // File storage table.
 var fileLocker = struct {
 	sync.RWMutex
-	fileTable map[string]string
-}{fileTable: make(map[string]string)}
+	fileTable map[int64]string
+}{fileTable: make(map[int64]string)}
 
 // =======================================================================
-// ======================= Function definitions ==========================
+// ======================= Helper Methods ================================
 // =======================================================================
 /* Checks error Value and prints/exits if non nil.
  */
 func checkError(err error) {
-	if err != nil {
-		fmt.Println("Error string: ", err)
-		os.Exit(-1)
-	}
+  if err != nil {
+    fmt.Println("Error: ", err)
+    os.Exit(-1)
+  }
 }
 
 /* Returns the SHA1 hash Value as a string, of a Key k.
  */
-func computeSHA1Hash(Key string) string {
-	buf := []byte(Key)
-	h := sha1.New()
-	h.Write(buf)
-	str := hex.EncodeToString(h.Sum(nil))
-	return str
-}
-
-/* Send periodic heartbeats to let predecessor know this node is still alive.
- */
-func sendAliveMessage(conn *net.UDPConn, addr string) {
-	for {
-		// send this node's id as an alive message
-		msg := CommandMessage{"_keepalive", addr, "", "", ""}
-		aliveMessage, err := json.Marshal(msg)
-		checkError(err)
-		b := []byte(aliveMessage)
-		_, err = conn.Write(b)
-		checkError(err)
-
-		time.Sleep(5 * time.Second)
-	}
-}
-
-/* Perform recursive search through finger tables to place me at the right spot.
- */
-func locateSuccessor(conn *net.UDPConn, addr string) {
-	fmt.Println("## Locating successor...")
-
-	// Send a special discover message.
-	msg := CommandMessage{"_discover", addr, "", "", ""}
-	msgInJSON, err := json.Marshal(msg)
-	checkError(err)
-
-	buf := []byte(msgInJSON)
-	_, err = conn.Write(buf)
-	fmt.Println("## Sent command: ", string(buf[:]))
-	checkError(err)
+func computeSHA1Hash(id string) string {
+  buf := []byte(id)
+  h := sha1.New()
+  h.Write(buf)
+  str := hex.EncodeToString(h.Sum(nil))
+  return str
 }
 
 /* Computes an identifier based on 2^m value and SHA1 hash.
  */
-func getIdentifier(key string) int64 {
-	id := computeSHA1Hash(key)
-	k := big.NewInt(0)
-	if _, ok := k.SetString(id, 16); ok {
-		fmt.Println("Number: ", k)
-	} else {
-		fmt.Println("Unable to parse into big int")
-	}
-	power := int64(math.Pow(2, m))
-	ret := (k.Mod(k, big.NewInt(power))).Int64()
-	fmt.Println("## Identifier is: ", ret)
-	return ret
+func computeIdentifier(id string) int64 {
+  hash := computeSHA1Hash(id)
+  k := big.NewInt(0)
+  if _, ok := k.SetString(hash, 16); ok {
+  } else {
+    fmt.Println("--> Unable to parse into big int")
+  }
+  power := int64(math.Pow(2, m))
+  ret := (k.Mod(k, big.NewInt(power))).Int64()
+  fmt.Println("--> Computed identifier: ", ret)
+  return ret
 }
 
-/* Retrieves a value from the finger table.
+/* Prints the finger table entries to standard output.
  */
-func getVal(key string) (string, bool) {
-	id := getIdentifier(key)
-	fingerLocker.RLock()
-	val := fingerLocker.fingerTable[id]
-	fingerLocker.RUnlock()
-	if val == "" {
-		return val, false
-	} else {
-		return val, true
-	}
+func printFingerTable() {
+  fmt.Println(" -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ ")
+  fmt.Printf(" Finger table (unordered) for this node: %d\n", myIdentifier)
+  fmt.Println(" -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ ")
+  fmt.Printf("| ID   |    VAL    |\n")
+  fingerLocker.RLock()
+  defer fingerLocker.RUnlock()
+
+  // Runs up to size m.
+  for id := range fingerLocker.fingerTable {
+    fmt.Printf("| %3d  | %9s |\n", id, fingerLocker.fingerTable[id])
+  }
+  fmt.Println(" -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ ")
 }
 
-/* Traverses finger table and finds the closest id to contact.
+/* Prints the finger table entries to standard output.
  */
-func sendToNextBestNode(msg CommandMessage) {
-	KeyIdentifier := getIdentifier(msg.Key)
-	// find node in finger table which is closest to requested Key
-	var closestNode string
-	minDistanceSoFar := math.Pow(2.0, float64(m))
+func printFileTable() {
+  fmt.Println(" -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ ")
+  fmt.Printf(" File table (unordered) for this node: %d\n", myIdentifier)
+  fmt.Println(" -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ ")
+  fmt.Printf("|  ID  |     VAL    |\n")
+  fileLocker.RLock()
+  defer fileLocker.RUnlock()
 
-	fingerLocker.RLock()
-	for nodeIden, nodeAddr := range fingerLocker.fingerTable {
-		if nodeIden-KeyIdentifier < int64(minDistanceSoFar) {
-			minDistanceSoFar = float64(nodeIden - KeyIdentifier)
-			closestNode = nodeAddr
-		}
-	}
-	fingerLocker.RUnlock()
-
-	// send message to closestNode
-	jsonMsg, err := json.Marshal(msg)
-	checkError(err)
-	buf := []byte(jsonMsg)
-	sendMessage(closestNode, buf)
+  // Runs up to size m.
+  for id := range fileLocker.fileTable {
+    fmt.Printf("| %3d  | %10s |\n", id, fileLocker.fileTable[id])
+  }
+  fmt.Println(" -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ ")
 }
 
-/* Sends a UDP message.
+/* Returns true if an identifier is between this node and successor (or some other node) on the id circle.
  */
-func sendMessage(addr string, msg []byte) {
-	fmt.Println("## Dialing to send message...")
-	fmt.Println("## Address to dial: ", addr)
-	fmt.Println("## Sending Message: ", string(msg))
-	conn, err := net.Dial("udp", addr)
-	checkError(err)
-	_, err = conn.Write(msg)
-	checkError(err)
+func isBetween(iden int64, me int64, suc int64) bool {
+  if suc < me {
+    if iden <= me && iden >= suc {
+      return true
+    } else if iden <= me && iden <= suc {
+      return false
+    } else {
+      return false
+    }
+  } else if suc >= me {
+    if iden >= me && iden <= suc {
+      return true
+    } else {
+      return false
+    }
+  } else {
+    return false
+  }
 }
 
-/* Handle incoming udp writes.
+// =======================================================================
+// ======================= RPC Methods ===================================
+// =======================================================================
+/* Updates a finger table entry at this node. Called during entry/exit/failures.
  */
-func listenForUDPMsgs(nodeAddr string) {
-	serverAddr, err := net.ResolveUDPAddr("udp", nodeAddr)
-	checkError(err)
-	conn, err := net.ListenUDP("udp", serverAddr)
-	checkError(err)
-	defer conn.Close()
+func (this *NodeRPCService) UpdateFingerTableEntry(msg *Msg, reply *Reply) error {
+  reply.Val = ""
+  // Lock 'em up.
+  fingerLocker.Lock()
+  defer fingerLocker.Unlock()
 
-	var msg CommandMessage
-	buf := make([]byte, 2048)
-	for {
-		fmt.Println("## Waiting for packet to arrive on udp port...")
-		n, _, err := conn.ReadFromUDP(buf)
-		fmt.Println("## Received Command: ", string(buf[:n]))
-		checkError(err)
-		err = json.Unmarshal(buf[:n], &msg)
-		checkError(err)
-		fmt.Println("Cmd: ", msg.Cmd)
+  // Update.
+  fingerLocker.fingerTable[msg.Id] = msg.Val
 
-		switch msg.Cmd {
-		case "_getVal":
-			v, haveKey := getVal(msg.Key)
-			if haveKey {
-				// respond with Value
-				responseMsg := CommandMessage{"_resVal", nodeAddr, msg.SourceAddr, msg.Key, v}
-				resp, err := json.Marshal(responseMsg)
-				checkError(err)
-				buf = []byte(resp)
-				// connect to source of request and send Value
-				sendMessage(msg.SourceAddr, buf)
-			} else {
-				// send to next best node
-				sendToNextBestNode(msg)
-			}
-		case "_setVal":
-			_, haveKey := getVal(msg.Key)
-			if haveKey {
-				// change Value
-				fileLocker.Lock()
-				fileLocker.fileTable[msg.Key] = msg.Val
-				fileLocker.Unlock()
-				responseMsg := CommandMessage{"_resGen", nodeAddr, msg.SourceAddr, "", "Key Updated"}
-				resp, err := json.Marshal(responseMsg)
-				checkError(err)
-				buf = []byte(resp)
-				// connect to source of request and send Value
-				sendMessage(msg.SourceAddr, buf)
-			} else {
-				// send to next best node
-				sendToNextBestNode(msg)
-			}
-		case "_resDisc":
-			successor = getIdentifier(msg.Val)
-			successorAddr = msg.Val
-			fmt.Println("## Successor updated to address: ", msg.Val)
-			fmt.Println("## Successor Identifier is: ", successor)
-		case "_discover":
-			nodeIdentifier := getIdentifier(msg.SourceAddr)
-			if successor == -1 {
-				fmt.Println("## No successor in network. Setting now to new node...")
-				fingerLocker.Lock()
-				fingerLocker.fingerTable[nodeIdentifier] = msg.SourceAddr
-				fingerLocker.Unlock()
-
-				// notify new node of its successor (current successor)
-				responseMsg := CommandMessage{"_resDisc", nodeAddr, msg.SourceAddr, "", nodeAddr}
-				resMsg, err := json.Marshal(responseMsg)
-				checkError(err)
-				buf := []byte(resMsg)
-				//fmt.Println("HERE 0")
-				sendMessage(msg.SourceAddr, buf)
-				//fmt.Println("HERE 1")
-				// update successor to new node
-				successor = nodeIdentifier
-				successorAddr = msg.SourceAddr
-				break
-			}
-			if nodeIdentifier >= identifier && nodeIdentifier <= successor {
-				// incoming node belongs between this node and its current successor
-				// update finger table
-				fmt.Println("New node fits between me and my successor. Updating finger table...")
-				fingerLocker.Lock()
-				fingerLocker.fingerTable[nodeIdentifier] = msg.SourceAddr
-				fingerLocker.Unlock()
-
-				// notify new node of its successor (current successor)
-				responseMsg := CommandMessage{"_resDisc", nodeAddr, msg.SourceAddr, "", successorAddr}
-				resMsg, err := json.Marshal(responseMsg)
-				checkError(err)
-				buf := []byte(resMsg)
-				sendMessage(msg.SourceAddr, buf)
-				// update successor to new node
-				successor = nodeIdentifier
-				successorAddr = msg.SourceAddr
-				break
-			} else {
-				// forward command to next best node
-				sendToNextBestNode(msg)
-				break
-			}
-		case "_keepalive":
-			//sendAliveMessage(conn *net.UDPConn, addr string)
-		}
-	}
+  // Let the other guy know it went well.
+  reply.Val = "ok"
+  return nil
 }
 
-/* Attempt to join the system given the ip:port of a running node.
+/* Iteratively locate appropriate successor for caller node.
+ */
+func (this *NodeRPCService) Discover(msg *Msg, reply *Reply) error {
+  reply.Val = ""
+  // Lock for reading.
+  fingerLocker.RLock()
+  defer fingerLocker.RUnlock()
+
+  currentClosestSuccessor := int64(9999)
+  // Find the best fit given an id.
+  for id := range fingerLocker.fingerTable {
+    if isBetween(id, msg.Id, myIdentifier) && isBetween(id, msg.Id, currentClosestSuccessor) {
+      msg.Id = id
+      msg.Val = fingerLocker.fingerTable[id]
+      currentClosestSuccessor = msg.Id
+    }
+  }
+
+  // Let the other guy know it went well.
+  reply.Val = "ok"
+  return nil
+}
+
+/* Uploads a file to this node, and then to r successor nodes.
+ */
+func (this *NodeRPCService) UploadFile(msg *Msg, reply *Reply) error {
+  reply.Val = ""
+  // Lock up file map for byte-byte mapping
+  fileLocker.Lock()
+  defer fileLocker.Unlock()
+
+
+  reply.Val = "ok"
+  return nil
+}
+
+/* Replicates a file across r successor nodes.
+ */
+func (this *NodeRPCService) ReplicateFile(msg *Msg, reply *Reply) error {
+  reply.Val = ""
+  // Replicate across r successor nodes. Sort the map first.
+  var idsOfClosestSuccessors []int
+  fingerLocker.RLock()
+  for id := range fingerLocker.fingerTable {
+    idsOfClosestSuccessors = append(idsOfClosestSuccessors, int(id))
+  }
+  sort.Ints(idsOfClosestSuccessors)
+
+  // XXX some bugs here----------
+  file := int64(000)
+  i := 0
+  // RPC chain across r nodes.
+  for _, k := range idsOfClosestSuccessors {
+    if (int64(k) >= myIdentifier) {
+      nodeRPCHandler, err := rpc.Dial("tcp", fingerLocker.fingerTable[int64(k)])
+      checkError(err)
+      msg := Msg {file, fingerLocker.fingerTable[int64(k)]}
+      var reply Reply
+      err = nodeRPCHandler.Call("NodeRPCService.UploadFile", &msg, &reply) // returns id in msg.Id, and ip:port in msg.Val
+      checkError(err)
+      nodeRPCHandler.Close()
+    }
+    i++
+    if (i >= replicationFactor) {
+      break
+    }
+  }
+  fingerLocker.RUnlock()
+  // XXX------------------------
+
+  // Let the other guy know it went well.
+  reply.Val = "ok"
+  return nil
+}
+
+/* Set up the listener for RPC requests, serve the connections when required.
+ */
+func launchRPCService(addr string) {
+  // Set up RPC service
+  server := new(NodeRPCService)
+  rpc.Register(server)
+  rpcAddr, err := net.ResolveTCPAddr("tcp", addr)
+  checkError(err)
+  rpcListener, err := net.ListenTCP("tcp", rpcAddr)
+  checkError(err)
+
+  // Listen for RPC requests and serve concurrently
+  for {
+    newRPCConnection, err := rpcListener.AcceptTCP()
+    checkError(err)
+    go rpc.ServeConn(newRPCConnection) // Serve a request in parallel
+  }
+  rpcListener.Close()
+}
+
+// =======================================================================
+// ======================= Logical Methods ===============================
+// =======================================================================
+/* Sets up the finger table entries from 0 to 2^m.
+ */
+func initializeFingerTable() {
+  fingerLocker.Lock()
+  defer fingerLocker.Unlock()
+
+  // (id + 2^i) mod m
+  for i := 0; i < int(m); i++ {
+    id := int64(math.Mod(float64(myIdentifier) + math.Pow(2, float64(i)),
+                 math.Pow(2, float64(m))))
+    fingerLocker.fingerTable[id] = "" // to be populated later
+  }
+}
+
+/* Send periodic heartbeats to let predecessor know this node is still alive.
+ */
+func sendAliveMessage(conn *net.UDPConn, src string, dest string) {
+  var reply Reply
+  for {
+    // send this node's id as an alive message
+    reply.Val = ""
+    aliveMessage, err := json.Marshal(reply)
+    checkError(err)
+    b := []byte(aliveMessage)
+    _, err = conn.Write(b)
+    checkError(err)
+
+    time.Sleep(5 * time.Second)
+  }
+}
+
+/* Attempt to join a system given the ip:port of a running node.
  */
 func connectToSystem(nodeAddr string, startAddr string) {
-	fmt.Println("## Connecting to system")
+  nodeRPCHandler, err := rpc.Dial("tcp", startAddr)
+  checkError(err)
+  defer nodeRPCHandler.Close()
 
-	nodeUDPAddr, err := net.ResolveUDPAddr("udp", nodeAddr)
-	checkError(err)
-	startUDPAddr, err := net.ResolveUDPAddr("udp", startAddr)
-	checkError(err)
-	conn, err := net.DialUDP("udp", nodeUDPAddr, startUDPAddr)
-	checkError(err)
-	defer conn.Close()
+  // Initialize finger table entries according to start node.
+  startIdentifier := computeIdentifier(startAddr)
+  fingerLocker.Lock()
+  for id := range fingerLocker.fingerTable {
+    if (id >= myIdentifier) && (id <= startIdentifier) {
+      fingerLocker.fingerTable[id] = startAddr
+    } else {
+      fingerLocker.fingerTable[id] = nodeAddr
+    }
+  }
+  fingerLocker.Unlock()
+  printFingerTable()
 
-	// Figure out where I am in the identifier circle.
-	locateSuccessor(conn, nodeAddr)
+  // Initialize values (base values of RPC chain)
+  msg := Msg {myIdentifier, nodeAddr}
+  currentClosestSuccessor := startIdentifier // iteratively gets closer to myIdentifier
+  currentClosestValue := startAddr
+  var reply Reply
+
+  // Start an RPC chain to place to populate finger table entries.
+  for {
+    err = nodeRPCHandler.Call("NodeRPCService.Discover", &msg, &reply) // returns id in msg.Id, and ip:port in msg.Val
+    checkError(err)
+
+    fmt.Println(msg.Id)
+
+    // Some guy is closer, update finger table accordingly.
+    if isBetween(msg.Id, myIdentifier, currentClosestSuccessor) && (reply.Val == "ok") {
+      currentClosestSuccessor = msg.Id
+      currentClosestValue = msg.Val
+      fingerLocker.Lock()
+      for id := range fingerLocker.fingerTable {
+        if isBetween(id, myIdentifier, currentClosestSuccessor) {
+          fingerLocker.fingerTable[id] = currentClosestValue
+        }
+      }
+      fingerLocker.Unlock()
+      break
+
+    // TODO: add non ok reply.Val for special cases/err handling.
+    } else if (reply.Val != "ok")  {
+      fmt.Println("--> Something went wrong with RPC.Discover: ", reply.Val)
+      break
+
+    // Went over the node-successor window, stop looping.
+    } else {
+      break
+    }
+  }
+
+  // Re-examine the table.
+  printFingerTable()
 }
+
 
 /* The main function.
  */
 func main() {
 	// Handle the command line.
-	if len(os.Args) > 6 || len(os.Args) < 4 {
-		fmt.Println("Usage: go run node.go [node ip:port] [starter-node ip:port] [m size] [-r=replicationFactor] [-t]")
+	if len(os.Args) > 4 || len(os.Args) < 2 {
+		fmt.Println("Usage: go run node.go [node ip:port] [starter-node ip:port]")
 		os.Exit(-1)
 	} else {
 		nodeAddr := os.Args[1]                    // ip:port of this node
 		startAddr := os.Args[2]                   // ip:port of initial node
-		m, _ = strconv.ParseFloat(os.Args[3], 64) // 2^m id circle size
-		flag.IntVar(&replicationFactor, "r", 2, "replication factor")
-		flag.BoolVar(&traceMode, "t", false, "trace mode")
-		flag.Parse()
+    replicationFactor = 2 // size of replication window
+    m = 7 // size of identifier circle
+    myIdentifier = computeIdentifier(nodeAddr) // node's identifier based on ip:port and m
 
-		successor = -1
+    // Initialize finger table entries from 0 to m for this node.
+    initializeFingerTable()
 
-		if nodeAddr == startAddr {
-			fmt.Println(KRED, "## Booting up system at addr ", nodeAddr)
-			listenForUDPMsgs(nodeAddr)
+    // Give the same nodeAddr and startAddr if there are no running nodes.
+    if nodeAddr == startAddr {
+			fmt.Println("--> Booting up system at addr ", nodeAddr)
 		} else {
-			fmt.Println(KRED, "## Attempting to connect to node at ", startAddr)
+			fmt.Println("--> Attempting to connect to node at ", startAddr)
 			connectToSystem(nodeAddr, startAddr)
-			listenForUDPMsgs(nodeAddr)
 		}
+
+    // Called by other nodes for rpc methods on this node's finger table.
+    launchRPCService(nodeAddr)
 	}
 }
