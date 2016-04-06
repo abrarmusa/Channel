@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 	"regexp"
+	"sync"
 )
 
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -56,6 +57,7 @@ type Video struct {
 type FileSys struct {
 	Id    int
 	Files map[string]Video
+	sync.RWMutex
 }
 
 // --> File <---
@@ -100,6 +102,10 @@ type Response struct {
 // DESCRIPTION:
 // -------------------
 // Prints error message into console in red
+// -------------------
+// INSTRUCTIONS:
+// -------------------
+// call utility.CheckError({ERROR})
 func CheckError(err error) {
 	if err != nil {
 		color.Set(color.FgRed)
@@ -114,6 +120,10 @@ func CheckError(err error) {
 // DESCRIPTION:
 // -------------------
 // This method saves file information into a json file in the filesys folder
+// -------------------
+// INSTRUCTIONS:
+// -------------------
+// call utility.SaveFileInfoToJson({YOUR JSON STRUCT AS A BYTE ARRAY}, {THE DIRECTORY PATH OF THE FILESYSTEM DIRECTORY})
 func SaveFileInfoToJson(jsondata []byte, dirPath string) {
 	jsonFile, err := os.Create(dirPath + "/localFiles.json")
 	CheckError(err)
@@ -127,6 +137,10 @@ func SaveFileInfoToJson(jsondata []byte, dirPath string) {
 // -------------------
 // Checks if the ip provided is valid. Accepts only the port as well eg. :3000 although in this case
 // it assumes the localhost ip address
+// -------------------
+// INSTRUCTIONS:
+// -------------------
+// call utility.ValidIP("{YOUR IP ADDRESS STRING}", "{THE IP FORMAT STRING FOR YOUR OUTPUT")
 func ValidIP(ipAddress string, field string) bool {
 	re, _ := regexp.Compile(`[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\:[0-9]{1,5}|\:[0-9]{1,5}`)
 	if re.MatchString(ipAddress) {
@@ -141,6 +155,10 @@ func ValidIP(ipAddress string, field string) bool {
 // DESCRIPTION:
 // -------------------
 // Prints out the list of locally available files and their paths and sizes
+// -------------------
+// INSTRUCTIONS:
+// -------------------
+// call utility.PrintFileSysTable("{DIRECTORY PATH OF YOUR FILESYSTEM DIRECTORY}"")
 func PrintFileSysTable(dirPath string) {
 	locFiles, err := ioutil.ReadFile(dirPath + "/localFiles.json")
 	CheckError(err)
@@ -151,16 +169,16 @@ func PrintFileSysTable(dirPath string) {
 	err = json.Unmarshal(locFiles, &fpaths)
 	CheckError(err)
 	colorprint.Info("LOCALLY AVAILABLE")
-	fmt.Println("----------------------------------------------------------------------------------------------")
-	fmt.Println("   SL   |         NAME         |              DIRECTORY PATH              |       SIZE       |")
-	fmt.Println("----------------------------------------------------------------------------------------------")
+	fmt.Println("--------------------------------------------------------------------------------------------------------")
+	fmt.Println("   SL   |              NAME              |              DIRECTORY PATH              |       SIZE       |")
+	fmt.Println("--------------------------------------------------------------------------------------------------------")
 	for i, value := range fpaths.Files {
 		file, err := os.Open(value.Path)
 		CheckError(err)
 		fi, err := file.Stat()
 		CheckError(err)
-		fmt.Printf("  %4d  |%20s  |%40s  | %13.2f kb |\n", (i + 1), value.Name, value.Path, float64(fi.Size())/float64(1024))
+		fmt.Printf("  %4d  |%30s  |%40s  | %13.2f kb |\n", (i + 1), value.Name, value.Path, float64(fi.Size())/float64(1024))
 	}
-	fmt.Println("----------------------------------------------------------------------------------------------")
+	fmt.Println("--------------------------------------------------------------------------------------------------------")
 
 }
