@@ -30,19 +30,25 @@ From this design we assume the followings true:
 * There is exactly one ring (no hole, no inside loops).
 
 
-### RELATED WORK
+###RELATED WORK
 
 There are studies that have interpreted above assumptions differently, or have articulated scenarios when they can get broken. 
 
 
 
-### IMPLEMENTATION
+----------------------------------------------------------------
+Hey I am working on it right now & aim for writing UPTO this point. (including the abstract)
+----------------------------------------------------------------
 
-The final product is developed using Go language.
 
-1. For all nodes to agree on a single system state:
+###IMPLEMENTATION
 
-2. To utilize the Chord DHT in media streaming:
+For this, I think it should be about how we integrate media streaming code into Chord DHT and BRBR... which I can't write about.
+
+
+###EVALUATION
+
+Same, it should be about the results from the streaming. 
 
 
 ###REFERENCES
