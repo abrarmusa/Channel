@@ -22,7 +22,6 @@ import (
   "encoding/json"
   "fmt"
   "net"
-  "io"
   "os"
   "time"
   "math"
@@ -30,6 +29,12 @@ import (
   "math/big"
   "runtime"
   "github.com/arcaneiceman/GoVector/govec"
+)
+
+const (
+  STREAM = "Received _stream command from node: "
+  CLIENTPORT = "8081"
+  MESSAGES   = 5
 )
 
 // =======================================================================
@@ -412,15 +417,15 @@ func sendPredInfo(src string, succ string) {
 * Responsible for triggering heartbeat goroutines, backup goroutine and command loop
 */
 func startUpSystem(nodeAddr string) {
+  nodeProcessName := "NodeProcessID" + string(identifier) // process name must be unique
+  Logger := govec.Initialize(nodeProcessName, "NodeLog") // govec stuff
 
   serverAddr, err := net.ResolveUDPAddr("udp", nodeAddr)
   checkError(err)
 
   go handlePredecessorHeartbeats()
   go handleSuccessorHeartbeats()
-
   go maintainBackup()
-
 
   // fmt.Println("Trying to listen on: ", serverAddr)
   conn, err := net.ListenUDP("udp", serverAddr)
@@ -441,7 +446,9 @@ func startUpSystem(nodeAddr string) {
 
     switch msg.Cmd {
       case "_stream":
-        fmt.Println("Received _stream command from: ", msg.SourceAddr)
+        streamLocalMsg := STREAM + msg.SourceAddr
+        Logger.LogLocalEvent(streamLocalMsg)
+        //fmt.Println("Received _stream command from: ", msg.SourceAddr)
         cmdMsg := CommandMessage{"_resStream", myAddr, msg.SourceAddr, "Stream Server Address", streamServerAddress, nil, msg.Type}
         b := getJSONBytes(cmdMsg)
         sendMessage(msg.SourceAddr, b)
@@ -533,8 +540,16 @@ func startUpSystem(nodeAddr string) {
       case "_resInfo":
         fmt.Println("Received _resInfo")
         if msg.Type == "ftab" {
-          ftab[k] = msg.Val
-          fmt.Println("Set finger table entry ", msg.Key, " to ", ftab[k])
+
+          // Update finger table entries that fit in between the window.
+          for id := range ftab {
+            if betweenIdens(k, identifier, id) {
+              ftab[id] = msg.Val
+            }
+          }
+          printFingerTable()
+          //ftab[k] = msg.Val // PROBLEM
+
         } else if msg.Type == "streamServer" {
           fmt.Println("Received address of chordNode for streaming: ", msg.Val)
           streamServerChannel <- msg.Val
@@ -577,8 +592,16 @@ func startUpSystem(nodeAddr string) {
       case "_discover":
         nodeIdentifier := getIdentifier(msg.SourceAddr)
         if successor == -1 {
-          // fmt.Println("No successor in network. Setting now to new node...")
-          ftab[nodeIdentifier] = msg.SourceAddr // TODO: PROBLEM
+
+          // Update finger table entries that fit in between the window.
+          for id := range ftab {
+            if betweenIdens(nodeIdentifier, identifier, id) {
+              ftab[id] = msg.SourceAddr
+            }
+          }
+          printFingerTable()
+          // ftab[nodeIdentifier] = msg.SourceAddr // PROBLEM
+
           // notify new node of its successor (current successor)
           responseMsg := CommandMessage {"_resDisc", nodeAddr, msg.SourceAddr, "", nodeAddr, nil, ""}
           resMsg, err := json.Marshal(responseMsg)
@@ -598,8 +621,17 @@ func startUpSystem(nodeAddr string) {
           sendPredInfo(successorAddr, msg.SourceAddr)
           // Update new node's pred to me (do we really need this since new node explicitly asks for pred)
           sendPredInfo(msg.SourceAddr, myAddr)
+
           // fmt.Println("New node fits between me and my successor. Updating finger table...")
-          ftab[nodeIdentifier] = msg.SourceAddr
+          // Update finger table entries that fit in between the window.
+          for id := range ftab {
+            if betweenIdens(successor, identifier, id) {
+              ftab[id] = msg.SourceAddr
+            }
+          }
+          printFingerTable()
+          // ftab[nodeIdentifier] = msg.SourceAddr // PROBLEM
+
           // notify new node of its successor (current successor)
           responseMsg := CommandMessage {"_resDisc", nodeAddr, msg.SourceAddr, "", successorAddr, nil, ""}
           resMsg, err := json.Marshal(responseMsg)
@@ -636,7 +668,6 @@ func connectToSystem(nodeAddr string, startAddr string) {
   <-c
 
   initFingerTable(conn, nodeAddr)
-  printFingerTable()
 }
 
 /*
@@ -751,8 +782,6 @@ func Start(thisAddr string, startNodeAddr string, ssa string, sca string) {
     streamServerChannel = make(chan string, 1)
 
     // fmt.Println("THIS NODE'S IDENTIFIER IS: ", identifier)
-
-    Logger := govec.Initialize("Node", "Node_log")
 
     if (myAddr == startAddr) {
       // fmt.Println("First node in system. Listening for incoming connections...")
