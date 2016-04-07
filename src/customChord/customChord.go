@@ -29,7 +29,7 @@ import (
   "strconv"
   "math/big"
   "runtime"
-  //"./lib/fileshare"
+  "github.com/arcaneiceman/GoVector/govec"
 )
 
 // =======================================================================
@@ -44,6 +44,9 @@ type CommandMessage struct {
   Val string
   Store map[string]string
   Type string
+}
+type Msg struct {
+  Content, RealTimestamp string
 }
 
 var traceMode bool
@@ -190,7 +193,7 @@ func handleSuccessorHeartbeats() {
 */
 func stabilizeNode(position string) {
   // SCRATCH WORK:
-  
+
   // ONE SIMPLE WAY: inquire about our failed successors identifier
   // A node who had a predecessor with that identifier is now our new successor
   // But what if two consecutive nodes fail then this wouldnt work in some cases (unless?)
@@ -733,6 +736,8 @@ func Start(thisAddr string, startNodeAddr string, ssa string, sca string) {
     streamServerChannel = make(chan string, 1)
 
     fmt.Println("THIS NODE'S IDENTIFIER IS: ", identifier)
+
+    Logger := govec.Initialize("Node", "Node_log")
 
     if (myAddr == startAddr) {
       fmt.Println("First node in system. Listening for incoming connections...")
