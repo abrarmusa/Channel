@@ -348,7 +348,7 @@ func writeToFileHelper(fname string, video utility.Video) string {
 // This method loads up a local json file to see which files are available in the local file system. Once
 // the read has been completed, the files are then processed into the utility.utility.FileSys map accordingly
 func processLocalVideosIntoFileSys() {
-	locFiles, err := ioutil.ReadFile("../filesys/localFiles.json")
+	locFiles, err := ioutil.ReadFile(consts.DirPath+"/localFiles.json")
 	utility.CheckError(err)
 	files := make([]utility.File, 0)
 
