@@ -25,14 +25,25 @@ type NodeRPCService int
 
 func (this *NodeRPCService) StartStreaming(msg *Msg, reply *Reply) error {
 	// "udp://127.0.0.1:1234"
-	addr := "udp://127.0.0.1" + msg.Address
-	cmd := exec.Command("ffmpeg", "-start_number", msg.Val, "-re", "-i", dest, "-r", "10", 
-	"-vcodec", "mpeg4", "-f", "mpegts", addr)
+	//addr := "udp://127.0.0.1" + msg.Address
 
 	var out bytes.Buffer
 	var stderr bytes.Buffer
+	
+
+	cmd0 := exec.Command("pwd")
+	cmd0.Stdout = &out
+	_ = cmd0.Start()
+	_ = cmd0.Wait()
+	fmt.Println("PWD: ", out.String())
+
+
+	cmd := exec.Command("ffmpeg", "-start_number", msg.Val, "-re", "-i", dest, "-r", "10", 
+	"-vcodec", "mpeg4", "-f", "mpegts", msg.Address)
+
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
+
 	err := cmd.Start()
 
 	if err != nil {
@@ -46,6 +57,10 @@ func (this *NodeRPCService) StartStreaming(msg *Msg, reply *Reply) error {
 	err = cmd.Wait()
 	//fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
 	log.Printf("Frame streaming finished with error: %v", err)
+	if err != nil {
+    	fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+    	return err
+	}
 	reply.Val = "ok"
 	return nil
 }
@@ -73,7 +88,7 @@ func launchRPCService(addr string) {
 
 func getFrames(dest string) {
 	// ffmpeg -i sample.mp4 -r 100 -f image2 output/%05d.png
-	cmd := exec.Command("ffmpeg", "-i", "../FFMPEG/sample.mp4", "-r", "100", "-f",
+	cmd := exec.Command("ffmpeg", "-i", "FFMPEG/sample.mp4", "-r", "100", "-f",
 		"image2", dest)
 	err := cmd.Start()
 	checkError(err)

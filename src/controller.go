@@ -8,6 +8,8 @@ import (
 	"net/rpc"
 	"log"
 	"time"
+	"fmt"
+	"strconv"
 )
 
 // streamerClient.ListenForStream("udp://127.0.0.1:1234")
@@ -50,29 +52,48 @@ func main() {
 	thisAddr := os.Args[1]
 	startNodeAddr := os.Args[2]
 	streamingServerAddress := os.Args[3]
-	streamingClientAddress := os.Args[4]
+	streamingClientAddress := "udp://127.0.0.1" + os.Args[4]
 	name := os.Args[5]
 
 	go customChord.Start(thisAddr, startNodeAddr, streamingServerAddress, streamingClientAddress)
-	go streamerClient.ListenForStream("udp://127.0.0.1:1234")
+	go streamerClient.ListenForStream(streamingClientAddress)
 	go streamerServer.Start(streamingServerAddress, name)
 
-	addr := ""
-	for addr == "" {
-		log.Printf("Attempting to get stream server in 2 seconds...")
-		time.Sleep(2 * time.Second)
-		addr = customChord.GetStreamingServer("0")
-	}
+	/* TEMPORARY: DECIDES FILE SEGMENT SEQUENCE NUMBER */
+	filename := "output " + os.Args[6]
+	customChord.SetStoreVal(filename)
+	/*===================================================*/
 
-	if addr != "" {
-		var handler *rpc.Client
-		for handler == nil {
+	var k int
+	fmt.Println("*TEST* Enter a number after connecting a node to continue fetching output *TEST*")
+    fmt.Scanf("%d", &k)
+
+    var handlers [2]*rpc.Client
+    for i := 0; i < 2; i++ {
+    	fn := "output " + strconv.FormatInt(int64(i), 10)
+		addr := ""
+		for addr == "" {
 			log.Printf("Attempting to get stream server in 2 seconds...")
 			time.Sleep(2 * time.Second)
-			handler = streamerClient.GetRpcHandler(addr)
+			addr = customChord.GetStreamingServer(fn)
 		}
-		streamerClient.StartStreaming(handler, 0, "0", streamingClientAddress)
-	} else {
-		log.Printf("GetStreamingServer returned empty address. Quitting.")
+		log.Println("Stream Server address: ", addr)
+
+		//var handler *rpc.Client
+		for handlers[i] == nil {
+				log.Printf("Attempting to get rpc handler in 2 seconds...")
+				time.Sleep(2 * time.Second)
+				handlers[i] = streamerClient.GetRpcHandler(addr)
+		}
+		// JUST FOR TESTING SINCE FILE NOT DISTRIBUTED ACCORDING TO IDENTIFIER
+		if i == 1 {
+			handlers[1] = streamerClient.GetRpcHandler(":14356")
+		}
 	}
+		//if i == 0 {
+			streamerClient.StartStreaming(handlers[0], 0, "0", streamingClientAddress)
+		//} else if i == 1 {
+			streamerClient.StartStreaming(handlers[1], 0, "300", streamingClientAddress)
+		//}
+	//}
 }

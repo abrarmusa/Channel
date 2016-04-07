@@ -28,7 +28,7 @@ type NodeRPCService int
 
 func ListenForStream(addr string) {
 	// ffplay udp://127.0.0.1:1234
-	go func() {
+	//go func() {
 		cmd := exec.Command("ffplay", addr)
 		err := cmd.Start()
 		if err != nil {
@@ -37,7 +37,7 @@ func ListenForStream(addr string) {
 		log.Printf("Waiting to get stream...")
 		err = cmd.Wait()
 		log.Printf("Getting stream finished with error: %v", err)
-	}()
+	//}()
 }
 
 func GetRpcHandler(rpcAddr string) (*rpc.Client) {
