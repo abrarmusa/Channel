@@ -2,11 +2,11 @@
 
 ###INTRODUCTION
 
-A significant number of distributed hash table (DHT) models have been developed taking  peer-to-peer (P2P) applications explicitly into account. These prototypes include CAN, Chord, Pastry, Kademlia and more. But it is not true that DHT exclusively serves best P2P designs. By definition, P2P systems are merely networked environment where every node is responsible both as a client and a server. DHT-based infrastructure provides the overlay network with a certain way of locating data, since it can distribute content across nodes evenly, scale up the network size and route among the nodes fast. 
+A significant number of distributed hash table (DHT) models have been developed taking peer-to-peer (P2P) applications explicitly into account. These prototypes include CAN, Chord, Pastry, Kademlia and more. P2P is a general term for any networked environment where every node is responsible both as a client and a server. DHT provides a popular infrastructure for P2P as it locates data without a server. It also distributes content evenly, scales up the network size and routes among the nodes fast. Among those prototypes, we chose the Chord DHT because it has a simple design and has been frequently studied and mentioned by researchers. 
 
-The purpose of this project is to build a DHT and utilize it in a P2P application. We chose Chord among the P2P-friendly DHT systems because it has a simple design and has been frequently studied and mentioned by researchers. Chord provides accessible material for implementing load balancing, scalability and routing efficiency. However, this early protocol does not yet elaborate the issues of correctness and reliability. P2P environments “have high churn rates: nodes join and leave the overlay continuously and do not stay in the overlay for long”. [Castro] In the context of DHT alone, there are possible cases that can go wrong during the network traffic. Studies have discovered and improved correctness-related invariants implicated in traditional DHT designs including Chord. Key challenge is at node failure or connection failure that the system is to maintain the topological structure.
+This project addressed the motivated problem of maintaining the Chord ring structure at node and communication failures. Regarding this concern, studies have discovered and improved possible incorrectness cases in traditional DHT designs including Chord.
 
-This motivated problem is an on-going learning process and has been left as a soft requirement of this project. As a practical goal, this project aims to perform media streaming atop the final product. It requires querying the network for multiple files and serializing messages and data chunks. This shows that the ring-management properties of our Chord DHT implementation are valid, even though it has shortcomings. (Summarize more specific results about streaming.)
+Our interest is in approaching this known problem at the application level.  After building the DHT P2P overlay network, we have performed media streaming atop the system. This includes querying  serialized messages and data chunks. The results demonstrate two fold. First, it is a practical method to test the system. [ should elaborate – one sentence ]  Second, it may open possibility to detect and oversee the overlay topology from this higher layer, as a number of researchers suggested.
 
 
 ###DESIGN
@@ -30,19 +30,25 @@ From this design we assume the followings true:
 * There is exactly one ring (no hole, no inside loops).
 
 
-### RELATED WORK
+###RELATED WORK
 
 There are studies that have interpreted above assumptions differently, or have articulated scenarios when they can get broken. 
 
 
 
-### IMPLEMENTATION
+----------------------------------------------------------------
+Hey I am working on it right now & aim for writing UPTO this point. (including the abstract)
+----------------------------------------------------------------
 
-The final product is developed using Go language.
 
-1. For all nodes to agree on a single system state:
+###IMPLEMENTATION
 
-2. To utilize the Chord DHT in media streaming:
+For this, I think it should be about how we integrate media streaming code into Chord DHT and BRBR... which I can't write about.
+
+
+###EVALUATION
+
+Same, it should be about the results from the streaming. 
 
 
 ###REFERENCES
