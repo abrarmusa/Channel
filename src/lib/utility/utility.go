@@ -66,9 +66,10 @@ type FileSys struct {
 // -------------------
 // This struct represents the Files as their names and the directory that they are located in
 type File struct {
-	Name      string `json:"name"`
-	Path      string `json:"dir"`
-	SegsAvail []int  `json:"segsavail"`
+	Name      string  `json:"name"`
+	Path      string  `json:"dir"`
+	SegNums   int64   `json:"segnums"`
+	SegsAvail []int64 `json:"segsavail"`
 }
 
 // --> FilePath <---

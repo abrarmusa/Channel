@@ -6,10 +6,8 @@ import (
 	"../player"
 	"../ui"
 	"../utility"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/rpc"
@@ -253,72 +251,72 @@ func GetVideoSegment(fname string, segId int, nodeAdd string) utility.VidSegment
 // --------------------------------------------------------------------------------------------
 // DESCRIPTION:
 // -------------------
-// This method calls an RPC method to another node to obtain a particular segment of a video
-func saveSegsToFileSys(nodeAddr string, segNums int64, fname string) {
-	var newVid utility.Video
-	vidMap := make(map[int]utility.VidSegment)
-	var segsAvail []int64
-	progstr := "="
-	counter2, counter3, altc, downloadstr := 1, 1, (segNums / consts.Factor), 0
-	quit := make(chan int)
-	go func() {
-		c := time.Tick(1 * time.Second)
-		for _ = range c {
-			select {
-			default:
-				prog.RLock()
-				if prog.show == true {
-					downloadstr = ui.ProgressBar(progstr, counter3, downloadstr, int(segNums))
-				}
-				prog.RUnlock()
-			case <-quit:
-				return
-			}
-		}
+// // This method calls an RPC method to another node to obtain a particular segment of a video
+// func saveSegsToFileSys(nodeAddr string, segNums int64, fname string) {
+// 	var newVid utility.Video
+// 	vidMap := make(map[int]utility.VidSegment)
+// 	var segsAvail []int64
+// 	progstr := "="
+// 	counter2, counter3, altc, downloadstr := 1, 1, (segNums / consts.Factor), 0
+// 	quit := make(chan int)
+// 	go func() {
+// 		c := time.Tick(1 * time.Second)
+// 		for _ = range c {
+// 			select {
+// 			default:
+// 				prog.RLock()
+// 				if prog.show == true {
+// 					downloadstr = ui.ProgressBar(progstr, counter3, downloadstr, int(segNums))
+// 				}
+// 				prog.RUnlock()
+// 			case <-quit:
+// 				return
+// 			}
+// 		}
 
-	}()
-	for i := 1; i <= int(segNums); i++ {
-		vidMap[i] = GetVideoSegment(fname, i, nodeAddr)
-		segsAvail = append(segsAvail, int64(i))
-		counter2++
-		counter3++
-		downloadstr++
-		if counter2 == int(altc) {
-			progstr += "="
-			counter2 = 0
+// 	}()
+// 	for i := 1; i <= int(segNums); i++ {
+// 		vidMap[i] = GetVideoSegment(fname, i, nodeAddr)
+// 		segsAvail = append(segsAvail, int64(i))
+// 		counter2++
+// 		counter3++
+// 		downloadstr++
+// 		if counter2 == int(altc) {
+// 			progstr += "="
+// 			counter2 = 0
 
-		}
-		if i == int(segNums) {
-			quit <- 1
-		}
-	}
-	newVid = utility.Video{
-		Name:      fname,
-		SegNums:   segNums,
-		SegsAvail: segsAvail,
-		Segments:  vidMap,
-	}
-	localFileSys.Lock()
-	localFileSys.Files[fname] = newVid
-	localFileSys.Unlock()
-	fmt.Println()
+// 		}
+// 		if i == int(segNums) {
+// 			quit <- 1
+// 		}
+// 	}
+// 	newVid = utility.Video{
+// 		Name:      fname,
+// 		SegNums:   segNums,
+// 		SegsAvail: segsAvail,
+// 		Segments:  vidMap,
+// 	}
+// 	localFileSys.Lock()
+// 	localFileSys.Files[fname] = newVid
+// 	localFileSys.Unlock()
+// 	fmt.Println()
 
-	colorprint.Warning("Saving file info into filesystem table")
-	localFileSys.RLock()
-	vid := localFileSys.Files[fname]
-	localFileSys.RUnlock()
-	pathname := writeToFileHelper(fname, vid)
-	newFile := utility.File{
-		Name: fname,
-		Path: pathname,
-	}
-	filePaths.Files = append(filePaths.Files, newFile)
-	jsondata, err := json.Marshal(filePaths)
-	utility.CheckError(err)
-	utility.SaveFileInfoToJson(jsondata, consts.DirPath)
-	colorprint.Info(fname + " saved into file system. File is located at " + pathname + ".")
+// 	colorprint.Warning("Saving file info into filesystem table")
+// 	localFileSys.RLock()
+// 	vid := localFileSys.Files[fname]
+// 	localFileSys.RUnlock()
+// 	pathname := writeToFileHelper(fname, vid)
+// 	newFile := utility.File{
+// 		Name: fname,
+// 		Path: pathname,
+// 	}
+// 	filePaths.Files = append(filePaths.Files, newFile)
+// 	jsondata, err := json.Marshal(filePaths)
+// 	utility.CheckError(err)
+// 	utility.SaveFileInfoToJson(jsondata, consts.DirPath)
+// 	colorprint.Info(fname + " saved into file system. File is located at " + pathname + ".")
 
-}
+// }
 
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -397,14 +395,14 @@ func getHelper(nodeRPC string, input string, fname string, cmd string) {
 	colorprint.Debug("<<<< " + input)
 	nodeAddr := input
 	// Connect to utility.Service via RPC // returns *Client, err
-	avail, segNums, _ := CheckFileAvailability(fname, nodeAddr)
+	avail, _, _ := CheckFileAvailability(fname, nodeAddr)
 	if avail && (cmd == "get") {
 		colorprint.Info(">>>> Would you like to get the file from the node[" + nodeRPC + "]?(y/n)")
 		fmt.Scan(&input)
 		colorprint.Debug("<<<< " + input)
 		if input == "y" {
 
-			saveSegsToFileSys(nodeAddr, segNums, fname)
+			// saveSegsToFileSys(nodeAddr, segNums, fname)
 		}
 	}
 }
@@ -443,12 +441,16 @@ func playHelper(fname string) {
 func Initialize(nodeRPC string) *utility.FileSys {
 	if !utility.ValidIP(nodeRPC, "[node RPC ip:port]") {
 		colorprint.Alert("Please provide a valid IP string.")
-		return
+		return nil
 	}
 	// ========================================
 	// localFileSys = &sync.RWMutex{}
 	progLock = &sync.RWMutex{}
 	// ========================================
 	go setUpRPC(nodeRPC)
-	return *localFileSys
+	localFileSys = utility.FileSys{
+		Id:    1,
+		Files: make(map[string]utility.Video),
+	}
+	return &localFileSys
 }

@@ -17,7 +17,14 @@ import (
 // DESCRIPTION:
 // -------------------
 // Converts a file into several json encoded segments
-func SplitFile(filename string) {
+// TAG DETAILS:
+// 0 -> File will be split for testing 1 node
+// n > 0 -> File will be split for testing on n nodes
+// -------------------
+// INSTRUCTIONS:
+// -------------------
+// Call filemgmt.SplitFile("{your filename}", {tag})
+func SplitFile(filename string, tag int) {
 	bytes, err := ioutil.ReadFile(filename)
 	utility.CheckError(err)
 	var eightBSeg []byte
@@ -58,39 +65,50 @@ func SplitFile(filename string) {
 // -------------------
 // Looks into the json for a filename and processes the segments into the filesystem.
 // NOTE: A POINTER TO THE LOCAL FILESYSTEM MUST BE INPUT
-func ProcessLocalFiles() {
+func ProcessLocalFiles(localFileSys *utility.FileSys) {
 	locFiles, err := ioutil.ReadFile(consts.DirPath + "/localFiles.json")
-	fmt.Println("RED")
 	utility.CheckError(err)
 	var filePaths utility.FilePath
 	files := make([]utility.File, 0)
 	filePaths.Files = files
 	err = json.Unmarshal(locFiles, &filePaths)
 	utility.CheckError(err)
-	fmt.Println("========================    PROCESSING LOCAL FILES FOR SHARING    ========================")
+	fmt.Println("======================    PROCESSING LOCAL FILES INTO FILE SYSTEM    =====================")
 	fmt.Println("==========================================================================================")
 	for index, value := range filePaths.Files {
 		colorprint.Info("---------------------------------------------------------------------------")
 		fmt.Println((index + 1), ">> PROCESSING:", value.Name, "at "+value.Path)
 		substrind := strings.Index(value.Name, ".")
 		substr := value.Name[:substrind]
-		var vidBytes []byte
+		var vidmap map[int]utility.VidSegment
+		vidmap = make(map[int]utility.VidSegment)
+		// var vidBytes []byte
 		for i := 0; i < len(value.SegsAvail); i++ {
-			pathname := value.Path + substr + "_" + strconv.Itoa(value.SegsAvail[i])
-			fmt.Printf("\rProcessing segment %s for %s", strconv.Itoa(value.SegsAvail[i]), value.Name)
+			pathname := value.Path + substr + "_" + strconv.Itoa(int(value.SegsAvail[i]))
+			fmt.Printf("\rProcessing segment %s for %s out of %d segments", strconv.Itoa(int(value.SegsAvail[i])), value.Name, value.SegNums)
 			dat, err := ioutil.ReadFile(pathname)
 			utility.CheckError(err)
 			var vidSeg utility.VidSegment
 			err = json.Unmarshal(dat, &vidSeg)
 			utility.CheckError(err)
-			for j := 0; j < len(vidSeg.Body); j++ {
-				vidBytes = append(vidBytes, vidSeg.Body[j])
-			}
-			utility.CheckError(err)
+			vidmap[int(value.SegsAvail[i])] = vidSeg
+			// for j := 0; j < len(vidSeg.Body); j++ {
+			// 	vidBytes = append(vidBytes, vidSeg.Body[j])
+			// }
 		}
-		fmt.Println()
-		err := ioutil.WriteFile(consts.DirPath+"/saved/"+value.Name, vidBytes, 0777)
-		utility.CheckError(err)
+		vid := utility.Video{
+			Name:      value.Name,
+			SegNums:   value.SegNums,
+			SegsAvail: value.SegsAvail,
+			Segments:  vidmap,
+		}
+		localFileSys.Lock()
+		colorprint.Alert("LOCKING FILESYSTEM")
+		localFileSys.Files[value.Name] = vid
+		localFileSys.Unlock()
+		// err := ioutil.WriteFile(consts.DirPath+"/saved/"+value.Name, vidBytes, 0777)
+		// utility.CheckError(err)
+		colorprint.Debug("Locally available segments for " + value.Name + " saved into the filesystem")
 		colorprint.Info("---------------------------------------------------------------------------")
 
 	}
@@ -120,41 +138,59 @@ func procName(filename string) string {
 	return filename[:dotindex]
 }
 
-// saveVidSeg(filename string, vidSeg utility.VidSegment) string
+// printFileSysContents(localFileSys *utility.FileSys)
 // --------------------------------------------------------------------------------------------
 // DESCRIPTION:
 // -------------------
-// Processes the filename into the appropriate folder name for the segments to be stored
-func saveVidSegIntoFileSys(filename string, vidSeg utility.VidSegment) {
+// Print the filesystem contents
+func PrintFileSysContents(localFileSys *utility.FileSys) {
+	colorprint.Debug("READING CONTENTS OF FILE SYSTEM NO. " + strconv.Itoa(localFileSys.Id))
+	localFileSys.Lock()
+	colorprint.Warning("======================================================================================================")
+	for index, value := range localFileSys.Files {
+
+		colorprint.Warning("--- FILE: " + index + " ---")
+		var altSegsAvail []string
+		if len(value.SegsAvail) > 5 {
+			for i := 0; i < len(value.SegsAvail); i++ {
+				if i <= 5 {
+					altSegsAvail = append(altSegsAvail, strconv.Itoa(int(value.SegsAvail[i])))
+				} else {
+					altSegsAvail = append(altSegsAvail, "...")
+					altSegsAvail = append(altSegsAvail, strconv.Itoa(int(value.SegsAvail[len(value.SegsAvail)-1])))
+					break
+				}
+			}
+		}
+		fmt.Println("FILENAME:", value.Name, "\nTOTAL SEGMENTS:", value.SegNums, "\nSEGMENTS AVAILABLE:", altSegsAvail)
+	}
+	localFileSys.Unlock()
+	colorprint.Warning("======================================================================================================")
+}
+
+// // addVidSegIntoFileSysJSON(filename string, vidSeg utility.VidSegment) {
+// --------------------------------------------------------------------------------------------
+// DESCRIPTION:
+// -------------------
+// Adds the video segment info into localFiles.json
+func addVidSegIntoFileSysJSON(filename string, ident int, vidSeg *utility.VidSegment) {
 	// TODO
 	// TODO
 	// TODO
 	// TODO
 }
 
-// addVidSegIntoFileSysJSON(filename string, vidSeg utility.VidSegment) {
-// --------------------------------------------------------------------------------------------
-// DESCRIPTION:
-// -------------------
-// Adds the video segment info into localFiles.json
-func addVidSegIntoFileSysJSON(filename string, ident int) {
-	// TODO
-	// TODO
-	// TODO
-	// TODO
-}
-
-// addVidSegIntoFileSysJSON(filename string, vidSeg utility.VidSegment) {
-// --------------------------------------------------------------------------------------------
-// DESCRIPTION:
-// -------------------
-// Adds the video segment info into localFiles.json
-func addVidSegIntoFileSysJSON(filename string, ident int) {
-	// TODO
-	// TODO
-	// TODO
-	// TODO
-}
+// // addVidSegIntoFileSysJSON(filename string, vidSeg utility.VidSegment) {
+// // --------------------------------------------------------------------------------------------
+// // DESCRIPTION:
+// // -------------------
+// // Adds the video segment info into localFiles.json
+// func addVidSegIntoFileSysJSON(filename string, ident int) {
+// 	// TODO
+// 	// TODO
+// 	// TODO
+// 	// TODO
+// }
 
 // // processLocalVideosIntoFileSys()
 // // --------------------------------------------------------------------------------------------
