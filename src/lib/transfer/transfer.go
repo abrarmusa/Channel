@@ -46,6 +46,7 @@ type Progress struct {
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 var localFileSys utility.FileSys
+var rpcAddress string
 var progLock *sync.RWMutex
 var filePaths utility.FilePath
 var prog Progress = Progress{
@@ -309,7 +310,6 @@ func setUpRPC(nodeRPC string) {
 	if e != nil {
 		log.Fatal("listen error:", e)
 	}
-	colorprint.Blue("Listening on " + nodeRPC + " for incoming RPC calls")
 	for i := 0; i >= 0; i++ {
 		conn, _ := l.Accept()
 		colorprint.Alert("=========================================================================================")
@@ -334,6 +334,7 @@ func setUpRPC(nodeRPC string) {
 // -------------------
 // This method responds to the user input requests
 func Instr(nodeRPC string) {
+	colorprint.Blue("Listening on " + rpcAddress + " for incoming RPC calls")
 	var input string
 	var fname string
 	for i := 0; i >= 0; i++ {
@@ -374,8 +375,7 @@ func getHelper(nodeRPC string, input string, fname string, cmd string) {
 		fmt.Scan(&input)
 		colorprint.Debug("<<<< " + input)
 		if input == "y" {
-
-			// saveSegsToFileSys(nodeAddr, segNums, fname)
+			// TODO
 		}
 	}
 }
@@ -386,7 +386,6 @@ func getHelper(nodeRPC string, input string, fname string, cmd string) {
 // -------------------
 // This method plays the requested video file. Visit localhost:8080
 func playHelper(fname string) {
-
 	colorprint.Info(">>>> Please enter the name of the file that you would like to play")
 	fmt.Scan(&fname)
 	colorprint.Debug("<<<< " + fname)
@@ -420,6 +419,7 @@ func Initialize(nodeRPC string) *utility.FileSys {
 	// localFileSys = &sync.RWMutex{}
 	progLock = &sync.RWMutex{}
 	// ========================================
+	rpcAddress = nodeRPC
 	go setUpRPC(nodeRPC)
 	localFileSys = utility.FileSys{
 		Id:    1,
