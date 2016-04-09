@@ -3,6 +3,7 @@ package transfer
 import (
 	"../../consts"
 	"../colorprint"
+	"../filemgmt"
 	"../player"
 	"../ui"
 	"../utility"
@@ -143,6 +144,25 @@ func (service *Service) GetFileSegment(segReq *utility.ReqStruct, segment *utili
 	return nil
 }
 
+// (service *Service) ReceiveFileSegment(seqStruct utility.SeqStruct, segment *utility.VidSegment)
+// ----------------------------------------------------------------------------------
+// DESCRIPTION:
+// -------------------
+// This method answers to an rpc to save a video segment locally into the local filesystem
+func (service *Service) ReceiveFileSegment(seqStruct *utility.SeqStruct, segment *utility.VidSegment) string {
+	filename := seqStruct.Filename
+	t := time.Now().String()
+	outputstr := ""
+	colorprint.Debug("------------------------------------------------------------------")
+	colorprint.Debug(">> " + t + "  <<")
+	colorprint.Debug("INBOUND RPC REQUEST: Receiving video segment for " + seqStruct.Filename)
+	filemgmt.AddVidSegIntoFileSys(filename, int64(seqStruct.SegNums), *segment, &localFileSys)
+	outputstr += ("\nSegment " + strconv.Itoa(segment.Id) + " received for " + filename)
+	colorprint.Warning(outputstr)
+	localFileSys.Unlock()
+	return "Video Segment saved on the node"
+}
+
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // OUTBOUND RPC CALL METHODS
@@ -159,11 +179,11 @@ func (service *Service) GetFileSegment(segReq *utility.ReqStruct, segment *utili
 // -------------------
 // INSTRUCTIONS:
 // -------------------
-// Call fileshare.CheckFileAvailability("{FILENAME STRING}, "{THE ADDRESS OF THE NODE FOR THE RPC CALL}", {*rpc.Client}")
+// Call transfer.CheckFileAvailability("{FILENAME STRING}, "{THE ADDRESS OF THE NODE FOR THE RPC CALL}", {*rpc.Client}")
 //
 // E.g code:
 //
-// avail, segNums, segsAvail := fileshare.CheckFileAvailability("sample.mp4", ":3000")
+// avail, segNums, segsAvail := transfer.CheckFileAvailability("sample.mp4", ":3000")
 //
 func CheckFileAvailability(filename string, nodeadd string) (bool, int64, []int64) {
 	colorprint.Debug("OUTBOUND REQUEST: Check utility.File Availability")
@@ -194,14 +214,14 @@ func CheckFileAvailability(filename string, nodeadd string) (bool, int64, []int6
 // -------------------
 // INSTRUCTIONS:
 // -------------------
-// Call fileshare.GetVideoSegment("sample.mp4", 45, ":3000")
+// Call transfer.GetVideoSegment("sample.mp4", 45, ":3000")
 //
 // E.g code:
 //
 // segNums := 100
 // vidMap := make(map[int]utility.VidSegment)
 // for i := 0; i < segNums; i++ {
-// 		vidMap[i] = fileshare.GetVideoSegment("sample.mp4", 45, ":3000")
+// 		vidMap[i] = transfer.GetVideoSegment("sample.mp4", 45, ":3000")
 // }
 //
 func GetVideoSegment(fname string, segId int, nodeAdd string) utility.VidSegment {
@@ -241,82 +261,35 @@ func GetVideoSegment(fname string, segId int, nodeAdd string) utility.VidSegment
 	return vidSeg
 }
 
-// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-// OTHER METHODS
-// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-
-// saveSegsToFileSys(service *rpc.Client, segNums int64, fname string)
+// SendVideoSegment(fname string, nodeAddr string, segment utility.VidSegment)
 // --------------------------------------------------------------------------------------------
 // DESCRIPTION:
 // -------------------
-// // This method calls an RPC method to another node to obtain a particular segment of a video
-// func saveSegsToFileSys(nodeAddr string, segNums int64, fname string) {
-// 	var newVid utility.Video
-// 	vidMap := make(map[int]utility.VidSegment)
-// 	var segsAvail []int64
-// 	progstr := "="
-// 	counter2, counter3, altc, downloadstr := 1, 1, (segNums / consts.Factor), 0
-// 	quit := make(chan int)
-// 	go func() {
-// 		c := time.Tick(1 * time.Second)
-// 		for _ = range c {
-// 			select {
-// 			default:
-// 				prog.RLock()
-// 				if prog.show == true {
-// 					downloadstr = ui.ProgressBar(progstr, counter3, downloadstr, int(segNums))
-// 				}
-// 				prog.RUnlock()
-// 			case <-quit:
-// 				return
-// 			}
-// 		}
-
-// 	}()
-// 	for i := 1; i <= int(segNums); i++ {
-// 		vidMap[i] = GetVideoSegment(fname, i, nodeAddr)
-// 		segsAvail = append(segsAvail, int64(i))
-// 		counter2++
-// 		counter3++
-// 		downloadstr++
-// 		if counter2 == int(altc) {
-// 			progstr += "="
-// 			counter2 = 0
-
-// 		}
-// 		if i == int(segNums) {
-// 			quit <- 1
-// 		}
-// 	}
-// 	newVid = utility.Video{
-// 		Name:      fname,
-// 		SegNums:   segNums,
-// 		SegsAvail: segsAvail,
-// 		Segments:  vidMap,
-// 	}
-// 	localFileSys.Lock()
-// 	localFileSys.Files[fname] = newVid
-// 	localFileSys.Unlock()
-// 	fmt.Println()
-
-// 	colorprint.Warning("Saving file info into filesystem table")
-// 	localFileSys.RLock()
-// 	vid := localFileSys.Files[fname]
-// 	localFileSys.RUnlock()
-// 	pathname := writeToFileHelper(fname, vid)
-// 	newFile := utility.File{
-// 		Name: fname,
-// 		Path: pathname,
-// 	}
-// 	filePaths.Files = append(filePaths.Files, newFile)
-// 	jsondata, err := json.Marshal(filePaths)
-// 	utility.CheckError(err)
-// 	utility.SaveFileInfoToJson(jsondata, consts.DirPath)
-// 	colorprint.Info(fname + " saved into file system. File is located at " + pathname + ".")
-
+// This method sends a utility.VidSegment to another node for saving
+// -------------------
+// INSTRUCTIONS:
+// -------------------
+// Call transfer.GetVideoSegment("sample.mp4", 45, ":3000")
+//
+// E.g code:
+//
+// var segment utility.VidSegment
+// vidMap := make(map[int]utility.VidSegment)
+// for i := 0; i < segNums; i++ {
+// 		vidMap[i] = transfer.SendVideoSegment("sample.mp4", ":3000", segment)
 // }
+//
+func SendVideoSegment(fname string, nodeAdd string, segNums int, segment utility.VidSegment) {
+	nodeService, err := rpc.Dial(consts.TransProtocol, nodeAdd)
+	utility.CheckError(err)
+	segReq := utility.SeqStruct{
+		Filename:  fname,
+		SegNums:   segNums,
+		SegmentId: segment.Id,
+	}
+	err = nodeService.Call("Service.ReceiveFileSegment", segReq, &segment)
+	utility.CheckError(err)
+}
 
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -371,7 +344,7 @@ func Instr(nodeRPC string) {
 		if input == "get" {
 			getHelper(nodeRPC, input, fname, cmd)
 		} else if input == "list" {
-			utility.PrintFileSysTable(consts.DirPath)
+
 		} else if input == "help" {
 			ui.Help()
 		} else if input == "play" {

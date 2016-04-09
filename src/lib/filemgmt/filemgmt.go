@@ -103,9 +103,10 @@ func ProcessLocalFiles(localFileSys *utility.FileSys) {
 			Segments:  vidmap,
 		}
 		localFileSys.Lock()
-		colorprint.Alert("LOCKING FILESYSTEM")
+		colorprint.Alert("\nLOCKING FILESYSTEM")
 		localFileSys.Files[value.Name] = vid
 		localFileSys.Unlock()
+		colorprint.Alert("\nUNLOCKING FILESYSTEM")
 		// err := ioutil.WriteFile(consts.DirPath+"/saved/"+value.Name, vidBytes, 0777)
 		// utility.CheckError(err)
 		colorprint.Debug("Locally available segments for " + value.Name + " saved into the filesystem")
@@ -168,111 +169,65 @@ func PrintFileSysContents(localFileSys *utility.FileSys) {
 	colorprint.Warning("======================================================================================================")
 }
 
+// // addVidSegIntoFileSys(filename string, vidSeg utility.VidSegment) {
+// --------------------------------------------------------------------------------------------
+// DESCRIPTION:
+// -------------------
+// Adds the video segment info into localFiles.json. Call this function after adding a new video segment to the file system
+func AddVidSegIntoFileSys(filename string, segNums int64, vidSeg utility.VidSegment, localFileSys *utility.FileSys) {
+	localFileSys.RLock()
+	_, ok := localFileSys.Files[filename]
+	localFileSys.RUnlock()
+	if ok {
+		localFileSys.Files[filename].Segments[vidSeg.Id] = vidSeg
+	} else {
+		var vidmap map[int]utility.VidSegment
+		var arr []int64
+		arr = append(arr, int64(vidSeg.Id))
+		vidmap[vidSeg.Id] = vidSeg
+		vid := utility.Video{
+			Name:      filename,
+			SegNums:   segNums,
+			SegsAvail: arr,
+			Segments:  vidmap,
+		}
+		localFileSys.Lock()
+		localFileSys.Files[filename] = vid
+		localFileSys.Unlock()
+	}
+}
+
 // // addVidSegIntoFileSysJSON(filename string, vidSeg utility.VidSegment) {
 // --------------------------------------------------------------------------------------------
 // DESCRIPTION:
 // -------------------
-// Adds the video segment info into localFiles.json
-func addVidSegIntoFileSysJSON(filename string, ident int, vidSeg *utility.VidSegment) {
-	// TODO
-	// TODO
-	// TODO
-	// TODO
+// Adds the video segment info into localFiles.json. Call this function after adding a new video segment to the file system
+func addVidSegIntoFileSysJSON(filename string, path string, segNums int, vidSeg utility.VidSegment) {
+	vidSegId := int64(vidSeg.Id)
+	locFiles, err := ioutil.ReadFile(consts.DirPath + "/localFiles.json")
+	utility.CheckError(err)
+	var filePaths utility.FilePath
+	files := make([]utility.File, 0)
+	filePaths.Files = files
+	err = json.Unmarshal(locFiles, &filePaths)
+	utility.CheckError(err)
+	var filefound bool = false
+	for _, value := range filePaths.Files {
+		if value.Name == filename {
+			value.SegsAvail = append(value.SegsAvail, vidSegId)
+			filefound = true
+			break
+		}
+	}
+	if !filefound {
+		var file utility.File
+		file.Name = filename
+		file.Path = path
+		file.SegNums = int64(segNums)
+		file.SegsAvail = append(file.SegsAvail, vidSegId)
+	}
+
+	dat, err := json.Marshal(filePaths)
+	utility.CheckError(err)
+	utility.SaveFileInfoToJson(dat)
 }
-
-// // addVidSegIntoFileSysJSON(filename string, vidSeg utility.VidSegment) {
-// // --------------------------------------------------------------------------------------------
-// // DESCRIPTION:
-// // -------------------
-// // Adds the video segment info into localFiles.json
-// func addVidSegIntoFileSysJSON(filename string, ident int) {
-// 	// TODO
-// 	// TODO
-// 	// TODO
-// 	// TODO
-// }
-
-// // processLocalVideosIntoFileSys()
-// // --------------------------------------------------------------------------------------------
-// // DESCRIPTION:
-// // -------------------
-// // This method loads up a local json file to see which files are available in the local file system. Once
-// // the read has been completed, the files are then processed into the utility.utility.FileSys map accordingly
-// func processLocalVideosIntoFileSys() {
-// 	locFiles, err := ioutil.ReadFile(consts.DirPath + "/localFiles.json")
-// 	utility.CheckError(err)
-// 	files := make([]utility.File, 0)
-
-// 	filePaths.Files = files
-// 	err = json.Unmarshal(locFiles, &filePaths)
-// 	utility.CheckError(err)
-// 	// Initialize local file system
-// 	localFileSys = utility.FileSys{
-// 		Id:    1,
-// 		Files: make(map[string]utility.Video),
-// 	}
-// 	fmt.Println("========================    PROCESSING LOCAL FILES FOR SHARING    ========================")
-// 	fmt.Println("==========================================================================================")
-// 	for index, value := range filePaths.Files {
-
-// 		dat, err := ioutil.ReadFile(value.Path)
-// 		utility.CheckError(err)
-// 		colorprint.Info("---------------------------------------------------------------------------")
-// 		colorprint.Info(strconv.Itoa(index+1) + ": Processing " + value.Name + " at " + value.Path + " with " + strconv.Itoa(len(dat)/consts.Bytecount) + " segments.")
-// 		segsAvail, vidMap := convByteArrayToSeg(dat)
-
-// 		vid := utility.Video{
-// 			Name:      value.Name,
-// 			SegNums:   int64(len(dat) / consts.Bytecount),
-// 			SegsAvail: segsAvail,
-// 			Segments:  vidMap,
-// 		}
-// 		localFileSys.Lock()
-// 		localFileSys.Files[value.Name] = vid
-// 		localFileSys.Unlock()
-// 		colorprint.Info("Completed Processing " + value.Name + " at " + value.Path)
-// 		colorprint.Info("---------------------------------------------------------------------------")
-
-// 	}
-// 	fmt.Println("===============================    PROCESSING COMPLETE    ================================\n\n\n")
-
-// }
-
-// // convByteArrayToSeg(bytes []byte) ([]int64, map[int]utility.VidSegment)
-// // --------------------------------------------------------------------------------------------
-// // DESCRIPTION:
-// // -------------------
-// // Converts the byte array from a video files into utility.Video Segments.
-// func convByteArrayToSeg(bytes []byte) ([]int64, map[int]utility.VidSegment) {
-// 	vidmap := make(map[int]utility.VidSegment)
-// 	var segsAvail []int64
-// 	var vidSeg utility.VidSegment
-// 	var eightBSeg []byte
-// 	counter, counter2, counter3 := 1, 1, 1
-// 	progstr := "="
-// 	blen := len(bytes)
-// 	altc := (blen / int(consts.Factor))
-// 	for index, element := range bytes {
-// 		eightBSeg = append(eightBSeg, element)
-// 		if counter == consts.Bytecount {
-// 			counter = 0
-// 			vidSeg = utility.VidSegment{
-// 				Id:   ((index % consts.Bytecount) + 1),
-// 				Body: eightBSeg,
-// 			}
-// 			vidmap[((index / consts.Bytecount) + 1)] = vidSeg
-// 			segsAvail = append(segsAvail, int64(((index / consts.Bytecount) + 1)))
-// 			eightBSeg = []byte{}
-// 		}
-// 		counter++
-// 		counter2++
-// 		counter3++
-// 		if counter2 == altc {
-// 			progstr += "~"
-// 			fmt.Printf("\r|%s|  - %d%%", progstr, ((counter3*100)/blen + 1))
-// 			counter2 = 0
-// 		}
-// 	}
-// 	fmt.Println()
-// 	return segsAvail, vidmap
-// }
