@@ -176,6 +176,7 @@ func PrintFileSysContents(localFileSys *utility.FileSys) {
 // Adds the video segment info into localFiles.json. Call this function after adding a new video segment to the file system
 func AddVidSegIntoFileSys(filename string, segNums int64, vidSeg utility.VidSegment, localFileSys *utility.FileSys) {
 	localFileSys.RLock()
+	colorprint.Debug("LOCK")
 	_, ok := localFileSys.Files[filename]
 	localFileSys.RUnlock()
 	if ok {
@@ -194,7 +195,9 @@ func AddVidSegIntoFileSys(filename string, segNums int64, vidSeg utility.VidSegm
 		localFileSys.Lock()
 		localFileSys.Files[filename] = vid
 		localFileSys.Unlock()
+
 	}
+	colorprint.Debug("UNLOCK")
 }
 
 // // addVidSegIntoFileSysJSON(filename string, vidSeg utility.VidSegment) {

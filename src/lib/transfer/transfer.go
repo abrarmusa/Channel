@@ -225,8 +225,9 @@ func CheckFileAvailability(filename string, nodeadd string) (bool, int64, []int6
 // 		vidMap[i] = transfer.GetVideoSegment("sample.mp4", 45, ":3000")
 // }
 //
-func GetVideoSegment(fname string, segId int, nodeAdd string) utility.VidSegment {
+func GetVideoSegment(fname string, segNums int64, segId int, nodeAdd string) utility.VidSegment {
 	nodeService, err := rpc.Dial(consts.TransProtocol, nodeAdd)
+	utility.CheckError(err)
 	waitstr := "."
 	counter, incrementer := 0, 1
 	if err != nil {
@@ -245,8 +246,9 @@ func GetVideoSegment(fname string, segId int, nodeAdd string) utility.VidSegment
 			}
 		}
 		nodeService, err = rpc.Dial(consts.TransProtocol, nodeAdd)
+		utility.CheckError(err)
 	}
-	// utility.CheckError(err)
+
 	prog.Lock()
 	prog.show = true
 	prog.Unlock()
@@ -255,10 +257,12 @@ func GetVideoSegment(fname string, segId int, nodeAdd string) utility.VidSegment
 		SegmentId: segId,
 	}
 	var vidSeg utility.VidSegment
+	vidSeg.Id = segId
 	err = nodeService.Call("Service.GetFileSegment", segReq, &vidSeg)
 	utility.CheckError(err)
 	err = nodeService.Close()
 	utility.CheckError(err)
+	filemgmt.AddVidSegIntoFileSys(fname, segNums, vidSeg, &localFileSys)
 	return vidSeg
 }
 
@@ -333,7 +337,7 @@ func setUpRPC(nodeRPC string) {
 // DESCRIPTION:
 // -------------------
 // This method responds to the user input requests
-func Instr(nodeRPC string) {
+func Instr() {
 	colorprint.Blue("Listening on " + rpcAddress + " for incoming RPC calls")
 	var input string
 	var fname string
@@ -343,7 +347,7 @@ func Instr(nodeRPC string) {
 		fmt.Scan(&input)
 		cmd := input
 		if input == "get" {
-			getHelper(nodeRPC, input, fname, cmd)
+			getHelper(rpcAddress, input, fname, cmd)
 		} else if input == "list" {
 
 		} else if input == "help" {

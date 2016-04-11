@@ -7,7 +7,7 @@ package consts
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 var Bytecount int = 1024
-var WindowSize int = Bytecount * 10
+var WindowSize int = Bytecount * 4
 var TransProtocol string = "tcp"
 var PrintByte string = "MB"
 var Factor int64 = 50
