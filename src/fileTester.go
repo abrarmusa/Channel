@@ -1,16 +1,20 @@
 package main
 
 import (
-	// "./lib/colorprint"
-	"./lib/player"
+	"./lib/colorprint"
+	// "./lib/player"
 	"./lib/transfer"
+	"net/http"
 	// "./lib/ui"
-	// "./lib/utility"
-	// "./consts"
+	"./consts"
 	"./lib/filemgmt"
+	"bytes"
+	// "./lib/utility"
 	"fmt"
 	"os"
 )
+
+var vid []byte
 
 func noder(myAddr string) {
 	// filename := "sample1.mp4"
@@ -26,7 +30,10 @@ func noder(myAddr string) {
 	filemgmt.PrintFileSysContents(localFileSys)
 	transfer.Instr()
 }
+
 func main() {
+
+	vid = []byte{}
 	myAddr := os.Args[1]
 	if os.Args[2] == "2" {
 		noder(myAddr)
@@ -50,7 +57,7 @@ func main() {
 			// now get the file segments from the node 5000
 
 			// var vidbytes []byte
-			go player.Run()
+			// go player.Run()
 			for i := 1; i <= int(segNums); i++ {
 				// fmt.Println("Getting seg ", i)
 				vidSeg := transfer.GetVideoSegment("sample1.mp4", segNums, i, ":5000")
@@ -58,6 +65,7 @@ func main() {
 				for j := 0; j < len(vidSeg.Body); j++ {
 					// fmt.Println("Sending")
 					player.ByteChan <- vidSeg.Body[j]
+					// vid = append(vid, vidSeg.Body[j])
 				}
 				// fmt.Println("continuing")
 
@@ -66,7 +74,65 @@ func main() {
 			// go func(){
 
 			// }
-			player.CloseStream <- 1
+			// player.CloseStream <- 1
 		}
+		Run()
 	}
+}
+
+func ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// c := 0
+	colorprint.Debug("Serving")
+	w.Header().Set("Content-type", "video/mp4")
+	var arr []byte
+	// _, err := w.Write(vid)
+	// utility.CheckError(err)
+	b := bytes.NewBuffer([]byte{})
+
+	for _, value := range vid {
+		arr = append(arr, value)
+		if len(arr) == consts.WindowSize {
+			b.Write(arr)
+			arr = []byte{}
+			if _, err := b.WriteTo(w); err != nil { // <----- here!
+				fmt.Fprintf(w, "%s", err)
+			}
+		} else {
+			continue
+		}
+
+	}
+	// _, err := w.Write(arr)
+	// utility.CheckError(err)
+
+}
+
+// Run()
+// --------------------------------------------------------------------------------------------
+// DESCRIPTION:
+// -------------------
+// This method starts the web player and the local streaming server
+// -------------------
+// INSTRUCTIONS:
+// -------------------
+// call player.Run()
+func Run() {
+	colorprint.Warning("Starting Player")
+	// ByteChan = make(chan byte, consts.WindowSize)
+	// CloseStream = make(chan int)
+	http.HandleFunc("/", ServeHTTP)
+	http.ListenAndServe(":8080", nil)
+	// colorprint.Blue("The video " + Filename + " is streaming at http://localhost:8080/" + Filename)
+	// switch runtime.GOOS {
+	// case "linux":
+	// 	err := exec.Command("xdg-open", "http://localhost:8080/").Start()
+	// 	utility.CheckError(err)
+	// case "windows", "darwin":
+	// 	err := exec.Command("open", "http://localhost:8080/").Start()
+	// 	utility.CheckError(err)
+	// default:
+	// 	colorprint.Alert("unsupported platform")
+	// }
+
+	// colorprint.Warning("Playing")
 }

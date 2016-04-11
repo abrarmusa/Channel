@@ -63,7 +63,6 @@ func ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				// fix error here
 				fmt.Println("IS IT BROKEN?", len(arr), " - ", c)
 				utility.CheckError(err)
-				w.Flush()
 				fmt.Println("NOPE")
 				prev = arr
 				arr = []byte{}
@@ -104,8 +103,8 @@ func ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // call player.Run()
 func Run() {
 	colorprint.Warning("Starting Player")
-	ByteChan = make(chan byte, consts.WindowSize)
-	CloseStream = make(chan int)
+	// ByteChan = make(chan byte, consts.WindowSize)
+	// CloseStream = make(chan int)
 	http.HandleFunc("/", ServeHTTP)
 	http.ListenAndServe(":8080", nil)
 	// colorprint.Blue("The video " + Filename + " is streaming at http://localhost:8080/" + Filename)
