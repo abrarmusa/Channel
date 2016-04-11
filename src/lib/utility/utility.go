@@ -3,11 +3,9 @@ package utility
 // package clientstream
 
 import (
-	"../colorprint"
-	"encoding/json"
+	"../../consts"
 	"fmt"
 	"github.com/fatih/color"
-	"io/ioutil"
 	"os"
 	"regexp"
 	"sync"
@@ -29,8 +27,24 @@ type VidSegment struct {
 	Body []byte
 }
 
+// --> ReqStruct <---
+// -------------------
+// DESCRIPTION:
+// -------------------
+// This struct holds the info for obtaining a video segment
 type ReqStruct struct {
 	Filename  string
+	SegmentId int
+}
+
+// --> SeqStruct <---
+// -------------------
+// DESCRIPTION:
+// -------------------
+// This struct holds the fields for sending a video segment to be saved onto a node
+type SeqStruct struct {
+	Filename  string
+	SegNums   int
 	SegmentId int
 }
 
@@ -66,8 +80,10 @@ type FileSys struct {
 // -------------------
 // This struct represents the Files as their names and the directory that they are located in
 type File struct {
-	Name string `json:"name"`
-	Path string `json:"dir"`
+	Name      string  `json:"name"`
+	Path      string  `json:"dir"`
+	SegNums   int64   `json:"segnums"`
+	SegsAvail []int64 `json:"segsavail"`
 }
 
 // --> FilePath <---
@@ -124,8 +140,8 @@ func CheckError(err error) {
 // INSTRUCTIONS:
 // -------------------
 // call utility.SaveFileInfoToJson({YOUR JSON STRUCT AS A BYTE ARRAY}, {THE DIRECTORY PATH OF THE FILESYSTEM DIRECTORY})
-func SaveFileInfoToJson(jsondata []byte, dirPath string) {
-	jsonFile, err := os.Create(dirPath + "/localFiles.json")
+func SaveFileInfoToJson(jsondata []byte) {
+	jsonFile, err := os.Create(consts.DirPath + "/localFiles.json")
 	CheckError(err)
 	jsonFile.Write(jsondata)
 	jsonFile.Close()
@@ -148,37 +164,4 @@ func ValidIP(ipAddress string, field string) bool {
 	}
 	fmt.Println("\x1b[31;1mError: "+field+":"+ipAddress, "is not in the correct format\x1b[0m")
 	return false
-}
-
-// PrintFileSysTable()
-// --------------------------------------------------------------------------------------------
-// DESCRIPTION:
-// -------------------
-// Prints out the list of locally available files and their paths and sizes
-// -------------------
-// INSTRUCTIONS:
-// -------------------
-// call utility.PrintFileSysTable("{DIRECTORY PATH OF YOUR FILESYSTEM DIRECTORY}"")
-func PrintFileSysTable(dirPath string) {
-	locFiles, err := ioutil.ReadFile(dirPath + "/localFiles.json")
-	CheckError(err)
-	files := make([]File, 0)
-
-	var fpaths FilePath
-	fpaths.Files = files
-	err = json.Unmarshal(locFiles, &fpaths)
-	CheckError(err)
-	colorprint.Info("LOCALLY AVAILABLE")
-	fmt.Println("--------------------------------------------------------------------------------------------------------")
-	fmt.Println("   SL   |              NAME              |              DIRECTORY PATH              |       SIZE       |")
-	fmt.Println("--------------------------------------------------------------------------------------------------------")
-	for i, value := range fpaths.Files {
-		file, err := os.Open(value.Path)
-		CheckError(err)
-		fi, err := file.Stat()
-		CheckError(err)
-		fmt.Printf("  %4d  |%30s  |%40s  | %13.2f kb |\n", (i + 1), value.Name, value.Path, float64(fi.Size())/float64(1024))
-	}
-	fmt.Println("--------------------------------------------------------------------------------------------------------")
-
 }
