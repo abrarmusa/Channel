@@ -209,6 +209,8 @@ The streaming portion of this system made use of FFMPEG and HTTP external librar
 
 The system was tested against a limited number of nodes for correctness, on a local network. As such, it is assumed that no packets are lost in node-node communication. Correctness was evaluated on the basis of the contents of the finger tables after joins and failures. It was also tested if files get saved at the correct locations along the ring. Since each node is effectively both a client and server, the addition of GoVector logs was straight forward, as an event is produced when a node (in its main thread, since the system has no concurrency apart from heartbeat messages) either reads a UDP packet, sends a UDP packet, or responds via RPC to a stream request. Since there is a fair amount of communication required, the ShiViz diagrams are heavily populated, but one can then track the messages that are sent and received.
 
+Note that there are currently some issues regarding the ShiViz integration, and so the logs are not properly outputted. This issue will be fixed in time for the demo.
+
 \subsection{Streaming}
 
 The system was tested using a sample MP4 file which was split into a file of JSON encodings (of which are replicated across some number of nodes in a system). Correctness is then to just simply see if the file correctly plays, and in order, through VLC. There should be no loss of quality as all the testing was done locally, and so packets should not have been lost. 
