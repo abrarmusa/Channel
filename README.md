@@ -11,3 +11,8 @@ Need to do this for govec lib: `go getgithub.com/arcaneiceman/GoVector/govec`
 - Feb. 29: proposal due
 - Mar. 18: project status meeting w/ TA
 - Apr. 11: final report and code due
+
+
+### TO RUN THE SYSTEM
+
+run "go run controller.go [this node address] [start node address] [streaming server address] [streaming client address] [node name]"
