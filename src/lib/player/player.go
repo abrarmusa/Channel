@@ -46,18 +46,10 @@ var CloseStream chan int
 // player.ByteChan <- tmp
 //
 func ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// waitingbytes, err := ioutil.ReadFile(consts.DirPath + "/waiting.mp4")
-	// utility.CheckError(err)
 	colorprint.Debug("Serving")
 	w.Header().Set("Content-type", "video/mp4")
 	var arr []byte = []byte{}
-	// _, err := w.Write(vid)
-	// utility.CheckError(err)
 	b := bytes.NewBuffer([]byte{})
-	// b.Write(waitingbytes)
-	// _, err = b.WriteTo(w)
-	// colorprint.Debug("RRRdd")
-	// utility.CheckError(err)
 	c := 0
 	for tmp := range ByteChan {
 		arr = append(arr, tmp)
@@ -79,65 +71,6 @@ func ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	utility.CheckError(err)
 	colorprint.Debug("VIDEO STREAM COMPLETED. CLOSING STREAM")
 	w.Write([]byte("Video Completed"))
-	// colorprint.Debug("------------------------------------------------------------------")
-	// for {
-	// 	select {
-	// 	case tmp := <-ByteChan:
-	// 		// colorprint.Debug("RECEIVED")
-	// 		c++
-	// 		arr = append(arr, tmp)
-	// 		if len(arr) == 4096 {
-	// 			b.Write(arr)
-	// 			arr = []byte{}
-	// 			_, err := b.WriteTo(w)
-	// 			fmt.Printf("%s", r.Header)
-	// 			fmt.Printf("\rSending 4096 bytes. Sequence number is %d", c)
-	// 			if err != nil {
-	// 				colorprint.Debug("err")
-	// 			}
-	// 			// utility.CheckError(err)
-	// 		}
-	// 	case <-CloseStream:
-	// 		for {
-	// 			select {
-	// 			case tmp2 := <-ByteChan:
-	// 				arr = append(arr, tmp2)
-	// 				if len(arr) == 4096 {
-	// 					b.Write(arr)
-	// 					arr = []byte{}
-	// 					_, err := b.WriteTo(w)
-	// 					fmt.Printf("%s", r.Header)
-	// 					// fmt.Printf("\rSending 4096 bytes. Sequence number is %d", c)
-	// 					if err != nil {
-	// 						colorprint.Debug("err")
-	// 					}
-	// 					// utility.CheckError(err)
-	// 				}
-	// 			default:
-	// 				break
-	// 			}
-	// 		}
-	// 		colorprint.Debug("------------------------------------------------------------------")
-	// 		b.Write(arr)
-	// 		arr = []byte{}
-	// 		_, err := b.WriteTo(w)
-	// 		utility.CheckError(err)
-	// 		colorprint.Debug("VIDEO STREAM COMPLETED. CLOSING STREAM")
-	// 		w.Write([]byte("Video Completed"))
-	// 		colorprint.Debug("------------------------------------------------------------------")
-	// 		break
-	// 	default:
-	// 		// b.Write(waitingbytes)
-	// 		// _, err := b.WriteTo(w)
-	// 		// colorprint.Debug("RRRdd")
-	// 		// utility.CheckError(err)
-	// 		// continue
-	// 		fmt.Printf("%s", r.Header)
-	// 		fmt.Printf("\rWaiting for stream")
-	// time.Sleep(300 * time.Millisecond)
-	// 		continue
-	// 	}
-	// }
 	colorprint.Debug("CLOSING")
 	close(ByteChan)
 	close(CloseStream)
