@@ -1,0 +1,28 @@
+\begin{thebibliography}{1}
+
+\bibitem{3}
+P.~Druschel I.~Rowstron.
+\newblock Pastry: Scalable, decentralized object location and routing for
+  large-scale peer-to-peer systems.
+\newblock
+  \url{http://research.microsoft.com/en-us/um/people/antr/PAST/pastry.pdf},
+  2001.
+\newblock Accessed: 2016-28-02.
+
+\bibitem{2}
+D.~Karger M. F.~Kaashoek I.~Stoica, R.~Morris and H.~Balakrishnan.
+\newblock Chord: A scalable peer-to-peer lookup service for internet
+  applications.
+\newblock
+  \url{https://pdos.csail.mit.edu/papers/chord:sigcomm01/chord_sigcomm.pdf},
+  2001.
+\newblock Accessed: 2016-28-02.
+
+\bibitem{1}
+R.~Baldoni.
+\newblock Dynamic quorums for dht-based p2p networks.
+\newblock
+  \url{http://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=1565942}, 2005.
+\newblock Accessed: 2016-28-02.
+
+\end{thebibliography}
