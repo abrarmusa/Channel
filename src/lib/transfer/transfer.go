@@ -150,7 +150,7 @@ func (service *Service) GetFileSegment(segReq *utility.ReqStruct, segment *utili
 // DESCRIPTION:
 // -------------------
 // This method answers to an rpc to save a video segment locally into the local filesystem
-func (service *Service) ReceiveFileSegment(seqStruct *utility.SeqStruct, segment *utility.VidSegment) string {
+func (service *Service) ReceiveFileSegment(seqStruct *utility.SeqStruct, segment *utility.VidSegment) error {
 	filename := seqStruct.Filename
 	t := time.Now().String()
 	outputstr := ""
@@ -161,7 +161,8 @@ func (service *Service) ReceiveFileSegment(seqStruct *utility.SeqStruct, segment
 	outputstr += ("\nSegment " + strconv.Itoa(segment.Id) + " received for " + filename)
 	colorprint.Warning(outputstr)
 	localFileSys.Unlock()
-	return "Video Segment saved on the node"
+	colorprint.Warning("Video Segment saved on the node")
+	return nil
 }
 
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -274,7 +275,6 @@ func GetVideoSegment(fname string, segNums int64, segId int, nodeAdd string) uti
 // -------------------
 // INSTRUCTIONS:
 // -------------------
-<<<<<<< HEAD:src/lib/transfer/transfer.go
 // Call transfer.GetVideoSegment("sample.mp4", 45, ":3000")
 //
 // E.g code:
@@ -287,17 +287,6 @@ func GetVideoSegment(fname string, segNums int64, segId int, nodeAdd string) uti
 //
 func SendVideoSegment(fname string, nodeAdd string, segNums int, segment utility.VidSegment) {
 	nodeService, err := rpc.Dial(consts.TransProtocol, nodeAdd)
-=======
-// This method loads up a local json file to see which files are available in the local file system. Once
-// the read has been completed, the files are then processed into the utility.utility.FileSys map accordingly
-func processLocalVideosIntoFileSys() {
-	locFiles, err := ioutil.ReadFile(consts.DirPath+"/localFiles.json")
-	utility.CheckError(err)
-	files := make([]utility.File, 0)
-
-	filePaths.Files = files
-	err = json.Unmarshal(locFiles, &filePaths)
->>>>>>> bbdc7b9b739a41183df9a242fe06ee97401ca755:src/lib/fileshare/fileshare.go
 	utility.CheckError(err)
 	segReq := utility.SeqStruct{
 		Filename:  fname,

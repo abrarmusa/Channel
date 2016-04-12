@@ -69,7 +69,7 @@ func ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				colorprint.Debug("err")
 			}
-			// utility.CheckError(err)
+			utility.CheckError(err)
 		}
 	}
 	colorprint.Debug("------------------------------------------------------------------")

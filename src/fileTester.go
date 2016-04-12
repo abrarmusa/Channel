@@ -6,16 +6,12 @@ import (
 	"./lib/transfer"
 	// "net/http"
 	// "./lib/ui"
-<<<<<<< HEAD
 	// "./consts"
 	"./lib/filemgmt"
 	// "bytes"
 
 	// "./lib/utility"
 	"fmt"
-=======
-	// "./lib/utility"
->>>>>>> bbdc7b9b739a41183df9a242fe06ee97401ca755
 	"os"
 	// "./consts"
 	// "io/ioutil"
@@ -39,7 +35,6 @@ func noder(myAddr string) {
 }
 
 func main() {
-<<<<<<< HEAD
 
 	vid = []byte{}
 	myAddr := os.Args[1]
