@@ -10,6 +10,8 @@ import (
 	"fmt"
 	//"strconv"
 	"io/ioutil"
+	"strings"
+	//"../customChord"
 )
 
 type Reply struct {
@@ -17,14 +19,31 @@ type Reply struct {
 }
 type Msg struct {
   Id int64
+  Filename string
   Val string
   Address string
+  Data []byte
 }
 
 var nodeAddr string
 var nodeName string
 var dest string
 type NodeRPCService int
+
+func (this *NodeRPCService) SaveToServer(msg *Msg, reply *Reply) error {
+	fmt.Println("FILEFOLDERSHIT: ", msg.Filename)
+	pathArr := strings.Split(msg.Filename, " ")
+
+	path := "FFMPEG/NodesData/" + nodeName + "/" + pathArr[0] + "/" + pathArr[1]
+	err := ioutil.WriteFile(path, msg.Data, 0644)
+	checkError(err)
+	reply.Val = "OKiE"
+
+	// TODO: Need to update chord dataMap
+	//customChord.SaveToStore(pathArr[0], pathArr[1], msg.Data)
+	return nil
+}
+
 
 func (this *NodeRPCService) StartStreaming(msg *Msg, reply *Reply) error {
 	// "udp://127.0.0.1:1234"
@@ -39,9 +58,9 @@ func (this *NodeRPCService) StartStreaming(msg *Msg, reply *Reply) error {
 	// _ = cmd0.Start()
 	// _ = cmd0.Wait()
 	// fmt.Println("PWD: ", out.String())
-
-
-	cmd := exec.Command("ffmpeg", "-start_number", msg.Val, "-re", "-i", dest, "-r", "10", 
+	fnArr := strings.Split(msg.Filename, ".")
+	path := dest + fnArr[0] + "/%05d.png"
+	cmd := exec.Command("ffmpeg", "-start_number", msg.Val, "-re", "-i", path, "-r", "10", 
 	"-vcodec", "mpeg4", "-f", "mpegts", msg.Address)
 
 	cmd.Stdout = &out
@@ -84,14 +103,16 @@ func launchRPCService(addr string) {
   for {
     newRPCConnection, err := rpcListener.AcceptTCP()
     checkError(err)
-    go rpc.ServeConn(newRPCConnection) // Serve a request in parallel
+    go rpc.ServeConn(newRPCConnection) // Serve a request concurrently
   }
   rpcListener.Close()
 }
 
 func GetFrames(filename string) int64 {
 	// ffmpeg -i sample.mp4 -r 100 -f image2 output/%05d.png
-	destPath := "FFMPEG/NodesData/" + nodeName + "/output/%05d.png"
+	fnArr := strings.Split(filename, ".")
+	// destPath := "FFMPEG/NodesData/" + nodeName + "/output/%05d.png"
+	destPath := "FFMPEG/NodesData/" + nodeName + "/" + fnArr[0] + "/%05d.png"
 	sourcePath := "FFMPEG/NodesData/" + nodeName + "/source/" + filename
 
 	// split video into png frames
@@ -103,7 +124,7 @@ func GetFrames(filename string) int64 {
 	err = cmd.Wait()
 	log.Printf("Frame processing finished with error: %v", err)
 
-	path := "FFMPEG/NodesData/" + nodeName + "/output/"
+	path := "FFMPEG/NodesData/" + nodeName + "/" + fnArr[0] + "/"
 	files,_ := ioutil.ReadDir(path)
 	numFrames := int64(len(files))
 
@@ -116,7 +137,7 @@ func Start(rpcServerAddr string, name string) {
 
 	//createDirectories() TODO
 
-	dest = "FFMPEG/NodesData/" + nodeName + "/output/%05d.png"
+	dest = "FFMPEG/NodesData/" + nodeName + "/"
 	//getFrames(dest)
 	log.Println("Launching rpc service to serve stream requests...")
 	launchRPCService(nodeAddr)

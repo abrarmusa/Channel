@@ -8,20 +8,22 @@ import (
 	"os"
 )
 
-type StreamNode struct {
-	Name string
-	Address string
-	startSeqNum string
-	numFrames int64
-	Next *StreamNode
-}
+// type StreamNode struct {
+// 	Name string
+// 	Address string
+// 	startSeqNum string
+// 	numFrames int64
+// 	Next *StreamNode
+// }
 type Reply struct {
   Val string
 }
 type Msg struct {
   Id int64
+  Filename string
   Val string
   Address string
+  Data []byte
 }
 var nodeAddr string
 type NodeRPCService int
@@ -50,10 +52,18 @@ func GetRpcHandler(rpcAddr string) (*rpc.Client) {
 	return nodeRPCHandler
 }
 
-func StartStreaming(handler *rpc.Client, iden int64, startFrame string, addr string) {
-	msg := Msg {iden, startFrame, addr}
+func StartStreaming(handler *rpc.Client, filename string, iden int64, startFrame string, addr string) {
+	msg := Msg {iden, filename, startFrame, addr, nil}
 	var reply Reply
 	err := handler.Call("NodeRPCService.StartStreaming", &msg, &reply) // returns id in msg.Id, and ip:port in msg.Val
+	checkError(err)
+	fmt.Println("Reply received: ", reply.Val)
+}
+
+func SaveToServer(handler *rpc.Client, nodename string, folderFilePath string, data []byte, addr string) {
+	msg := Msg {0, folderFilePath, nodename, addr, data}
+	var reply Reply
+	err := handler.Call("NodeRPCService.SaveToServer", &msg, &reply) // returns id in msg.Id, and ip:port in msg.Val
 	checkError(err)
 	fmt.Println("Reply received: ", reply.Val)
 }
