@@ -1,14 +1,13 @@
 # README.md
 
 The project is structured into packages - each module implementing it's own
-functionality. The main ones include: CustomChord, FileTransfer, StreamingServer
+functionality. The main ones at the current stage include: CustomChord, FileTransfer, StreamingServer
 and StreamingClient.
 
-The following is our project structure in src at the moment:
 
 To run a node you can run the following command in the src the command
 
-go run controller.go :14320 :14322 :1545 :1237 node2 
+`go run controller.go <arg0> <arg1> <arg2> <arg3> <arg4>`
 
 where:
 arg0: udp chord address for this node e.g :14321
@@ -22,7 +21,7 @@ the system.
 
 Instructions:
 After running the above for one node, do the same for however many nodes you wish
-to connect. After they're connected (you should see some finger table prints), 
+to connect. After they're connected (you should see some finger table prints),
 use node0 (since it has the sample.mp4 file we're using to test).
 Type 'sample.mp4' to trigger segmenting of video into frames. After it has split
 the file, the node will calculate identifiers for each segment and distribute the
