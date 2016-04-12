@@ -7,45 +7,45 @@ Name 1 in "I. Stoica, R. Morris, D. Karger, M. F. Kaashoek, and H. Balakrishnan.
 while executing---line 944 of file unsrt.bst
 Too many commas in name 1 of "I. Stoica, R. Morris, D. Karger, M. F. Kaashoek, and H. Balakrishnan." for entry 2
 while executing---line 944 of file unsrt.bst
-You've used 3 entries,
+You've used 4 entries,
             1791 wiz_defined-function locations,
-            457 strings with 4076 characters,
-and the built_in function-call counts, 452 in all, are:
-= -- 40
-> -- 16
+            462 strings with 4181 characters,
+and the built_in function-call counts, 590 in all, are:
+= -- 53
+> -- 20
 < -- 0
-+ -- 7
-- -- 4
-* -- 7
-:= -- 78
-add.period$ -- 12
-call.type$ -- 3
-change.case$ -- 3
++ -- 9
+- -- 5
+* -- 8
+:= -- 100
+add.period$ -- 16
+call.type$ -- 4
+change.case$ -- 4
 chr.to.int$ -- 0
-cite$ -- 3
-duplicate$ -- 15
-empty$ -- 55
-format.name$ -- 4
-if$ -- 104
+cite$ -- 4
+duplicate$ -- 20
+empty$ -- 73
+format.name$ -- 5
+if$ -- 137
 int.to.chr$ -- 0
-int.to.str$ -- 3
+int.to.str$ -- 4
 missing$ -- 0
-newline$ -- 21
-num.names$ -- 3
-pop$ -- 18
+newline$ -- 27
+num.names$ -- 4
+pop$ -- 24
 preamble$ -- 1
 purify$ -- 0
 quote$ -- 0
-skip$ -- 7
+skip$ -- 9
 stack$ -- 0
 substring$ -- 0
-swap$ -- 3
+swap$ -- 4
 text.length$ -- 0
 text.prefix$ -- 0
 top$ -- 0
 type$ -- 0
 warning$ -- 0
-while$ -- 3
-width$ -- 4
-write$ -- 38
+while$ -- 4
+width$ -- 5
+write$ -- 50
 (There were 2 error messages)

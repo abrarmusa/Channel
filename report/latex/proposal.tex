@@ -157,15 +157,33 @@ To deal with unexpected failures/a high churn rate and minimize the probability 
 
 \subsection{Ring maintenance}
 
-High node churn rates make the the maintenance of the ring structure troublesome. The original Chord paper \cite{2} suggests a protocol where each node periodically checks if its successor is still alive and updates their finger table accordingly (see Fig. \ref{5}). 
+Every participating node is a member of a ring. The node has links to a successor node (whose key is next highest) and a predecessor (whose key is closest past). The successor is also defined as the smallest key entry stored in each routing table. Chord ring topology is defined by the successor pointer. To maintain this topology, the system is required to have exactly one ring and all members in the ring in right order \cite{4}.
+
+Before any addition or removal of nodes proceeds, the ring's member relation is redefined. When the previous example of adding a node is about to occur, node C first asks the predecessor A for A's current successor key. The returning key is of node B, which becomes C's successor; and C becomes B's predecessor (represented as dashed line in Fig. \ref{55}). Until A notices that B now points to a different predecessor than itself, B has two members believing that they are the successor. 
+
+\begin{figure}[!htb]
+\includegraphics{figure3.png}
+\caption{\label{family}Left: adding node C to the ring. Right: removing node C from the ring.}
+\label{55}
+\end{figure}
+
+As seen in Fig. \ref{56}, the ring seems maintain with an appendage cause by C. However it does not circulate properly because A's idea of its successor B and B's idea of its predecessor C do not agree. High node churn rates in particular make this part troublesome. The original Chord paper \cite{2} suggests a protocol where each node periodically checks if its successor is still alive and updates their finger table accordingly (see Fig. \ref{5}). This protocol has been implemented into the system, and this detection runs in the background using heartbeat messages (to test for abrupt disconnections, as explained in section 2.2).
 
 \begin{figure}[!htb]
 \includegraphics{stabilize1.png}
 \caption{\label{family}Handling peer churn. The correct successor is the first node that is found to be alive by traversing in the clockwise direction (red arrows).}
 \label{5}
+\end{figure} 
+
+\begin{figure}[!htb]
+\includegraphics{figure5.png}
+\caption{\label{family}Left: adding node C to the ring. Right: removing node C from the ring.}
+\label{56}
 \end{figure}
 
-This protocol has been implemented into the system, and this detection runs in the background using heartbeat messages (to test for abrupt disconnections, as explained in section 2.2). 
+Every member pings the node whose key is locally stored as its processor and ask for its predecessor. In case the returned predecessor key does not agree with itself, the node redirect its successor pointer to the returned predecessor. Then the new predecessor will set its predecessor pointer to this node and the ring is repaired. For example, node A in Figure 5 asks node B for what B's predecessor is and B returns node C. Since B's predecessor is not A itself, A adopts B's predecessor C as new successor. For A, C is a rational choice for its successor because C clearly has larger key than A's – otherwise C could not have been A's former successor B's predecessor – and smaller than B's because B is C's successor. Thus after C sets A as its predecessor successfully, it continues to update routing tables and key responsibilities as appropriate. Since the paper does not provide much more details, the member is set to send two arbitrary messages expecting one back, as described on the page 3 of the proposal.
+
+An obvious weakness of this method, also mentioned in the Chord paper, is that it cannot handle concurrent joins. If more than two nodes C, D join between two members A, B (Figure 7) before the periodic heartbeat incorporates at least one node into the ring, B eventually sets its predecessor pointer to the later added D. Once A has been stabilized, it recognizes D as its successor and transfers proper key responsibility to D. C becomes not reachable from other members. Although this does not violate P. Zave's conditions for a “valid” overlay structure (i.e., exactly one ring and ordered), it is incorrect in terms of key responsibility. After the stabilization B becomes responsible for keys (D, B]. Thus a key between (D, C) will belong to B. However C is a live node that deserves to own the key in the range. The stabilization protocol and the successor list together resolve most of the cases regarding member changes in the ring. 
 
 \subsection{Media streaming and delivery}
 
@@ -193,7 +211,7 @@ The system was tested against a limited number of nodes for correctness, on a lo
 
 \subsection{Streaming}
 
-
+The system was tested using a sample MP4 file which was split into a file of JSON encodings (of which are replicated across some number of nodes in a system). Correctness is then to just simply see if the file correctly plays, and in order, through VLC. There should be no loss of quality as all the testing was done locally, and so packets should not have been lost. 
 
 \section{Limitations}
 

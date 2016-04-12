@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.1415926-2.5-1.40.14 (TeX Live 2013/Debian) (format=pdflatex 2014.11.5)  11 APR 2016 18:03
+This is pdfTeX, Version 3.1415926-2.5-1.40.14 (TeX Live 2013/Debian) (format=pdflatex 2014.11.5)  11 APR 2016 20:53
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -731,6 +731,12 @@ LaTeX Warning: Label `family' multiply defined.
 
 LaTeX Warning: Label `family' multiply defined.
 
+
+LaTeX Warning: Label `family' multiply defined.
+
+
+LaTeX Warning: Label `family' multiply defined.
+
 )
 \openout1 = `proposal.aux'.
 
@@ -979,15 +985,31 @@ File: images/figure1.png Graphic file (type png)
 Package pdftex.def Info: images/figure1.png used on input line 152.
 (pdftex.def)             Requested size: 225.84319pt x 190.46107pt.
 
-<images/stabilize1.png, id=142, 225.84375pt x 200.24812pt>
+<images/figure3.png, id=142, 225.84375pt x 106.14656pt>
+File: images/figure3.png Graphic file (type png)
+
+<use images/figure3.png>
+Package pdftex.def Info: images/figure3.png used on input line 165.
+(pdftex.def)             Requested size: 225.84319pt x 106.1463pt.
+
+<images/stabilize1.png, id=146, 225.84375pt x 200.24812pt>
 File: images/stabilize1.png Graphic file (type png)
 
 <use images/stabilize1.png>
-Package pdftex.def Info: images/stabilize1.png used on input line 163.
+Package pdftex.def Info: images/stabilize1.png used on input line 173.
 (pdftex.def)             Requested size: 225.84319pt x 200.24763pt.
- [3 <./images/figure1.png> <./images/stabilize1.png>] (./proposal.bbl
+
+<images/figure5.png, id=147, 225.84375pt x 109.1578pt>
+File: images/figure5.png Graphic file (type png)
+
+<use images/figure5.png>
+Package pdftex.def Info: images/figure5.png used on input line 179.
+(pdftex.def)             Requested size: 225.84319pt x 109.15753pt.
+ [3 <./images/figure1.png> <./images/figure3.png>]
+[4 <./images/stabilize1.png> <./images/figure5.png>] (./proposal.bbl
 LaTeX Font Info:    Try loading font information for OT1+pcr on input line 8.
- (/usr/share/texlive/texmf-dist/tex/latex/psnfss/ot1pcr.fd
+
+(/usr/share/texlive/texmf-dist/tex/latex/psnfss/ot1pcr.fd
 File: ot1pcr.fd 2001/06/04 font definitions for OT1/pcr.
 )
 Package microtype Info: Loading generic settings for font family
@@ -1028,18 +1050,22 @@ Underfull \hbox (badness 3138) in paragraph at lines 13--20
 001.  Ac-
  []
 
-[4]) 
-AED: lastpage setting LastPage
-[5
 
-]
-Package atveryend Info: Empty hook `BeforeClearDocument' on input line 219.
-Package atveryend Info: Empty hook `AfterLastShipout' on input line 219.
+Underfull \hbox (badness 2229) in paragraph at lines 29--33
+\OT1/ptm/m/n/10 (+20) chord.  [][]$\OT1/pcr/m/n/10 http : / / dl . acm . org / 
+citation . cfm ?
+ []
+
+) 
+AED: lastpage setting LastPage
+[5]
+Package atveryend Info: Empty hook `BeforeClearDocument' on input line 237.
+Package atveryend Info: Empty hook `AfterLastShipout' on input line 237.
  (./proposal.aux)
-Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 219.
-Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 219.
+Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 237.
+Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 237.
 Package rerunfilecheck Info: File `proposal.out' has not changed.
-(rerunfilecheck)             Checksum: E53FD6EF27074817D1533FB217C6CF84;1006.
+(rerunfilecheck)             Checksum: 64D00F43E86CB25104B15DE783DECED8;1006.
 
 
 LaTeX Warning: There were undefined references.
@@ -1049,13 +1075,13 @@ LaTeX Warning: There were multiply-defined labels.
 
  ) 
 Here is how much of TeX's memory you used:
- 12266 strings out of 493304
- 181302 string characters out of 6139871
- 333829 words of memory out of 5000000
- 15276 multiletter control sequences out of 15000+600000
+ 12282 strings out of 493304
+ 181555 string characters out of 6139871
+ 333983 words of memory out of 5000000
+ 15287 multiletter control sequences out of 15000+600000
  62928 words of font info for 233 fonts, out of 8000000 for 9000
  957 hyphenation exceptions out of 8191
- 43i,11n,51p,1137b,540s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 43i,11n,51p,1137b,499s stack positions out of 5000i,500n,10000p,200000b,80000s
 {/usr/share/texlive/texmf-dist/fonts/enc/dvips/base/8r.enc}</usr/share/texliv
 e/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/texlive/texmf
 -dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/share/texlive/texmf-dist/
@@ -1065,10 +1091,10 @@ uhvr8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/helvetic/uhvro8a.pfb>
 </usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/share/tex
 live/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/share/texlive/texmf-dist
 /fonts/type1/urw/times/utmri8a.pfb>
-Output written on proposal.pdf (5 pages, 223390 bytes).
+Output written on proposal.pdf (5 pages, 244622 bytes).
 PDF statistics:
- 210 PDF objects out of 1000 (max. 8388607)
- 165 compressed objects within 2 object streams
- 30 named destinations out of 1000 (max. 500000)
- 48282 words of extra memory for PDF output out of 51595 (max. 10000000)
+ 223 PDF objects out of 1000 (max. 8388607)
+ 174 compressed objects within 2 object streams
+ 33 named destinations out of 1000 (max. 500000)
+ 48292 words of extra memory for PDF output out of 51595 (max. 10000000)
 
