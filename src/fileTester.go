@@ -4,13 +4,18 @@ import (
 	// "./lib/colorprint"
 	"./lib/player"
 	"./lib/transfer"
+	// "net/http"
 	// "./lib/ui"
-	// "./lib/utility"
 	// "./consts"
 	"./lib/filemgmt"
+	// "bytes"
+
+	// "./lib/utility"
 	"fmt"
 	"os"
 )
+
+var vid []byte
 
 func noder(myAddr string) {
 	// filename := "sample1.mp4"
@@ -26,7 +31,10 @@ func noder(myAddr string) {
 	filemgmt.PrintFileSysContents(localFileSys)
 	transfer.Instr()
 }
+
 func main() {
+
+	vid = []byte{}
 	myAddr := os.Args[1]
 	if os.Args[2] == "2" {
 		noder(myAddr)
@@ -58,15 +66,19 @@ func main() {
 				for j := 0; j < len(vidSeg.Body); j++ {
 					// fmt.Println("Sending")
 					player.ByteChan <- vidSeg.Body[j]
+					vid = append(vid, vidSeg.Body[j])
 				}
 				// fmt.Println("continuing")
 
-				// // vidbytes = append(vidbytes, vidSeg.Body)
 			}
 			// go func(){
 
 			// }
-			player.CloseStream <- 1
+			fmt.Println("CLOSING")
+			close(player.ByteChan)
 		}
+		for {
+		}
+		// Run()
 	}
 }

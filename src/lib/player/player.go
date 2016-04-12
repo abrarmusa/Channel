@@ -4,11 +4,14 @@ import (
 	"../../consts"
 	"../colorprint"
 	"../utility"
+	// "io/ioutil"
+	"bytes"
 	"fmt"
 	"net/http"
+	// "time"
 	// "os/exec"
 	// "runtime"
-	"time"
+	// "time"
 )
 
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -43,51 +46,99 @@ var CloseStream chan int
 // player.ByteChan <- tmp
 //
 func ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	c := 0
+	// waitingbytes, err := ioutil.ReadFile(consts.DirPath + "/waiting.mp4")
+	// utility.CheckError(err)
+	colorprint.Debug("Serving")
 	w.Header().Set("Content-type", "video/mp4")
-	var arr []byte
-	// var arr2 []byte
-	var prev []byte
-	for {
-		select {
-		case tmp := <-ByteChan:
-			arr = append(arr, tmp)
-			c++
-			if c == consts.WindowSize {
-				t := time.Now().String()
-				colorprint.Debug("------------------------------------------------------------------")
-				colorprint.Debug(">> " + t + " <<")
-				fmt.Println("VIDEOSTREAM: Sending ", consts.WindowSize, " bytes of the video.")
-				_, err := w.Write(arr)
-
-				// fix error here
-				fmt.Println("IS IT BROKEN?", len(arr), " - ", c)
-				utility.CheckError(err)
-				w.Flush()
-				fmt.Println("NOPE")
-				prev = arr
-				arr = []byte{}
-				c = 0
-				colorprint.Debug("------------------------------------------------------------------")
-				// time.Sleep(5000 * time.Millisecond)
-			} else {
-				w.Write(prev)
+	var arr []byte = []byte{}
+	// _, err := w.Write(vid)
+	// utility.CheckError(err)
+	b := bytes.NewBuffer([]byte{})
+	// b.Write(waitingbytes)
+	// _, err = b.WriteTo(w)
+	// colorprint.Debug("RRRdd")
+	// utility.CheckError(err)
+	c := 0
+	for tmp := range ByteChan {
+		arr = append(arr, tmp)
+		if len(arr) == 4096 {
+			b.Write(arr)
+			arr = []byte{}
+			_, err := b.WriteTo(w)
+			fmt.Printf("\r%s", r.Header, "\nrSending 4096 bytes. Sequence number is %d", c)
+			if err != nil {
+				colorprint.Debug("err")
 			}
-		case <-CloseStream:
-			colorprint.Debug("------------------------------------------------------------------")
-			_, err := w.Write(arr)
-			utility.CheckError(err)
-			colorprint.Debug("VIDEO STREAM COMPLETED. CLOSING STREAM")
-			w.Write([]byte("Video Completed"))
-			colorprint.Debug("------------------------------------------------------------------")
-			break
-		default:
-			_, err := w.Write(prev)
-			// fix error here
-			fmt.Println("DO THIS", len(arr))
-			utility.CheckError(err)
+			// utility.CheckError(err)
 		}
 	}
+	colorprint.Debug("------------------------------------------------------------------")
+	b.Write(arr)
+	arr = []byte{}
+	_, err := b.WriteTo(w)
+	utility.CheckError(err)
+	colorprint.Debug("VIDEO STREAM COMPLETED. CLOSING STREAM")
+	w.Write([]byte("Video Completed"))
+	// colorprint.Debug("------------------------------------------------------------------")
+	// for {
+	// 	select {
+	// 	case tmp := <-ByteChan:
+	// 		// colorprint.Debug("RECEIVED")
+	// 		c++
+	// 		arr = append(arr, tmp)
+	// 		if len(arr) == 4096 {
+	// 			b.Write(arr)
+	// 			arr = []byte{}
+	// 			_, err := b.WriteTo(w)
+	// 			fmt.Printf("%s", r.Header)
+	// 			fmt.Printf("\rSending 4096 bytes. Sequence number is %d", c)
+	// 			if err != nil {
+	// 				colorprint.Debug("err")
+	// 			}
+	// 			// utility.CheckError(err)
+	// 		}
+	// 	case <-CloseStream:
+	// 		for {
+	// 			select {
+	// 			case tmp2 := <-ByteChan:
+	// 				arr = append(arr, tmp2)
+	// 				if len(arr) == 4096 {
+	// 					b.Write(arr)
+	// 					arr = []byte{}
+	// 					_, err := b.WriteTo(w)
+	// 					fmt.Printf("%s", r.Header)
+	// 					// fmt.Printf("\rSending 4096 bytes. Sequence number is %d", c)
+	// 					if err != nil {
+	// 						colorprint.Debug("err")
+	// 					}
+	// 					// utility.CheckError(err)
+	// 				}
+	// 			default:
+	// 				break
+	// 			}
+	// 		}
+	// 		colorprint.Debug("------------------------------------------------------------------")
+	// 		b.Write(arr)
+	// 		arr = []byte{}
+	// 		_, err := b.WriteTo(w)
+	// 		utility.CheckError(err)
+	// 		colorprint.Debug("VIDEO STREAM COMPLETED. CLOSING STREAM")
+	// 		w.Write([]byte("Video Completed"))
+	// 		colorprint.Debug("------------------------------------------------------------------")
+	// 		break
+	// 	default:
+	// 		// b.Write(waitingbytes)
+	// 		// _, err := b.WriteTo(w)
+	// 		// colorprint.Debug("RRRdd")
+	// 		// utility.CheckError(err)
+	// 		// continue
+	// 		fmt.Printf("%s", r.Header)
+	// 		fmt.Printf("\rWaiting for stream")
+	// time.Sleep(300 * time.Millisecond)
+	// 		continue
+	// 	}
+	// }
+	colorprint.Debug("CLOSING")
 	close(ByteChan)
 	close(CloseStream)
 
@@ -104,10 +155,10 @@ func ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // call player.Run()
 func Run() {
 	colorprint.Warning("Starting Player")
-	ByteChan = make(chan byte, consts.WindowSize)
+	ByteChan = make(chan byte, consts.WindowSize*100000)
 	CloseStream = make(chan int)
 	http.HandleFunc("/", ServeHTTP)
-	http.ListenAndServe(":8080", nil)
+	go http.ListenAndServe(":8080", nil)
 	// colorprint.Blue("The video " + Filename + " is streaming at http://localhost:8080/" + Filename)
 	// switch runtime.GOOS {
 	// case "linux":
