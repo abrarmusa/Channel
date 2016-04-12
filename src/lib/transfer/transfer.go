@@ -162,7 +162,7 @@ func (service *Service) GetFileSegment(segReq *utility.ReqStruct, segment *utili
 // DESCRIPTION:
 // -------------------
 // This method answers to an rpc to save a video segment locally into the local filesystem
-func (service *Service) ReceiveFileSegment(seqStruct *utility.SeqStruct, segment *utility.VidSegment) string {
+func (service *Service) ReceiveFileSegment(seqStruct *utility.SeqStruct, segment *utility.VidSegment) error {
 	filename := seqStruct.Filename
 	t := time.Now().String()
 	outputstr := ""
@@ -173,7 +173,8 @@ func (service *Service) ReceiveFileSegment(seqStruct *utility.SeqStruct, segment
 	outputstr += ("\nSegment " + strconv.Itoa(segment.Id) + " received for " + filename)
 	colorprint.Warning(outputstr)
 	localFileSys.Unlock()
-	return "Video Segment saved on the node"
+	colorprint.Warning("Video Segment saved on the node")
+	return nil
 }
 
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-

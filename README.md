@@ -1,13 +1,12 @@
 # README.md
 
 The project is structured into packages - each module implementing it's own
-functionality. The main ones at the current stage include: CustomChord, FileTransfer, StreamingServer
+functionality. The main ones include: CustomChord, FileTransfer, StreamingServer
 and StreamingClient.
-
 
 To run a node you can run the following command in the src the command
 
-`go run controller.go <arg0> <arg1> <arg2> <arg3> <arg4>`
+`go run controller.go arg0 arg1 arg2 arg3 arg4`
 
 where:
 arg0: udp chord address for this node e.g :14321
