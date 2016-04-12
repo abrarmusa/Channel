@@ -12,33 +12,10 @@ import (
 	"strconv"
 )
 
-// streamerClient.ListenForStream("udp://127.0.0.1:1234")
-// 	handler0 := streamerClient.GetRpcHandler(":1342")
-// 	handler1 := streamerClient.GetRpcHandler(":1354")
-// 	streamerClient.StartStreaming(handler0, 0, "0")
-// 	streamerClient.StartStreaming(handler1, 1, "300")
+// func generateStreamerQueue() {
 
-// This method responds to the user input requests
-// func serveUser(nodeRPC string, nodeUDP string) {
-// 	var input string
-// 	var fname string
-// 	for {
-// 		fmt.Println()
-// 		colorprint.Info(">>>> Please enter a command")
-// 		input, err := fmt.Scanln(&input)
-// 		//fmt.Scan(&input)
-// 		cmd := input[0]
-
-// 		switch input {
-// 			case "stream":
-// 				filename := input[1]
-// 				addr := customChord.GetStreamingServer(filename)
-// 				handler := streamerClient.GetRpcHandler(addr)
-// 				streamerClient.StartStreaming(handler, 0, "0")
-// 		}
-
-// 	}
 // }
+
 /*
 	1. my upd address
 	2. starter node udp address
@@ -59,18 +36,38 @@ func main() {
 	go streamerClient.ListenForStream(streamingClientAddress)
 	go streamerServer.Start(streamingServerAddress, name)
 
-	/* TEMPORARY: DECIDES FILE SEGMENT SEQUENCE NUMBER */
-	filename := "output " + os.Args[6]
-	customChord.SetStoreVal(filename)
-	/*===================================================*/
+	var shareFile string
+	fmt.Println("====================================================")
+	fmt.Println("Please enter the name of the file you wish to share:")
+	fmt.Println("====================================================")
+	fmt.Scanf("%s", &shareFile)
 
-	var k int
-	fmt.Println("*TEST* Enter a number after connecting a node to continue fetching output *TEST*")
-    fmt.Scanf("%d", &k)
+	// MOCK DONE: SPLIT THE FILE IN PARTS - returns array of segment filenames (?) - array of strings
+	// TODO: DISTRIBUTE ALL PARTS USING CUSTOMCHORD
+	if shareFile != "none" || shareFile != "" {
+		totalSegments := streamerServer.GetFrames(shareFile)
+		fmt.Printf("Total number of extracted frames from %s: %d\n", shareFile, totalSegments)
+ // 	for _, seg := range segments {
+ //        customChord.TransferFileSegment(seg)
+ //    }
+	}
+	
+
+
+	// for a node which holds several parts, just ask for the stream ONCE (?)
+
+	var streamFile string
+	fmt.Println("====================================================")
+	fmt.Println("Please enter the name of the file you wish to stream:")
+	fmt.Println("====================================================")
+	fmt.Scanf("%s", &streamFile)
+	const numParts = 2
 
     var handlers [2]*rpc.Client
-    for i := 0; i < 2; i++ {
-    	fn := "output " + strconv.FormatInt(int64(i), 10)
+
+    // Get streaming info for all parts
+    for i := 0; i < numParts; i++ {
+    	fn := streamFile + " " + strconv.FormatInt(int64(i), 10)
 		addr := ""
 		for addr == "" {
 			log.Printf("Attempting to get stream server in 2 seconds...")
@@ -85,15 +82,16 @@ func main() {
 				time.Sleep(2 * time.Second)
 				handlers[i] = streamerClient.GetRpcHandler(addr)
 		}
-		// JUST FOR TESTING SINCE FILE NOT DISTRIBUTED ACCORDING TO IDENTIFIER
-		if i == 1 {
-			handlers[1] = streamerClient.GetRpcHandler(":14356")
-		}
 	}
-		//if i == 0 {
-			streamerClient.StartStreaming(handlers[0], 0, "0", streamingClientAddress)
-		//} else if i == 1 {
-			streamerClient.StartStreaming(handlers[1], 0, "300", streamingClientAddress)
-		//}
-	//}
+
+	// Start streaming
+	// ASSUMPTION: EACH NODE STORES EITHER ATLEAST 300 SEQUENTIAL FRAMES, OR TILL THE END OF FRAME SEQUENCE
+	for i := 0; i < numParts; i++ {
+		streamerClient.StartStreaming(handlers[i], 0, strconv.FormatInt(int64(i*300), 10), streamingClientAddress)
+	}
+
+
+
+		// streamerClient.StartStreaming(handlers[0], 0, "0", streamingClientAddress)
+		// streamerClient.StartStreaming(handlers[1], 0, "300", streamingClientAddress)
 }

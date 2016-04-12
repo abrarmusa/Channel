@@ -2,11 +2,14 @@ package streamerServer
 
 import (
 	"net"
+	//"os"
 	"net/rpc"
 	"log"
 	"os/exec"
 	"bytes"
 	"fmt"
+	//"strconv"
+	"io/ioutil"
 )
 
 type Reply struct {
@@ -31,11 +34,11 @@ func (this *NodeRPCService) StartStreaming(msg *Msg, reply *Reply) error {
 	var stderr bytes.Buffer
 	
 
-	cmd0 := exec.Command("pwd")
-	cmd0.Stdout = &out
-	_ = cmd0.Start()
-	_ = cmd0.Wait()
-	fmt.Println("PWD: ", out.String())
+	// cmd0 := exec.Command("pwd")
+	// cmd0.Stdout = &out
+	// _ = cmd0.Start()
+	// _ = cmd0.Wait()
+	// fmt.Println("PWD: ", out.String())
 
 
 	cmd := exec.Command("ffmpeg", "-start_number", msg.Val, "-re", "-i", dest, "-r", "10", 
@@ -86,15 +89,25 @@ func launchRPCService(addr string) {
   rpcListener.Close()
 }
 
-func getFrames(dest string) {
+func GetFrames(filename string) int64 {
 	// ffmpeg -i sample.mp4 -r 100 -f image2 output/%05d.png
-	cmd := exec.Command("ffmpeg", "-i", "FFMPEG/sample.mp4", "-r", "100", "-f",
-		"image2", dest)
+	destPath := "FFMPEG/NodesData/" + nodeName + "/output/%05d.png"
+	sourcePath := "FFMPEG/NodesData/" + nodeName + "/source/" + filename
+
+	// split video into png frames
+	cmd := exec.Command("ffmpeg", "-i", sourcePath, "-r", "100", "-f",
+		"image2", destPath)
 	err := cmd.Start()
 	checkError(err)
 	log.Printf("Waiting for video to finish processing into individual frames...")
 	err = cmd.Wait()
 	log.Printf("Frame processing finished with error: %v", err)
+
+	path := "FFMPEG/NodesData/" + nodeName + "/output/"
+	files,_ := ioutil.ReadDir(path)
+	numFrames := int64(len(files))
+
+    return numFrames-1
 }
 
 func Start(rpcServerAddr string, name string) {
