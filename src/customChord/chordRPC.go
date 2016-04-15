@@ -243,19 +243,31 @@ func manageHeartbeats() {
 	msg := Msg{}
 
 	for {
-		if successorHandler != nil && predecessorHandler != nil {
+		if successorHandler != nil {
 			// check successor
 			err := successorHandler.Call("ChordService.Heartbeat", &msg, &reply)
 			if err != nil {
 				fmt.Println("Successor is DEAD!")
+				successorAddress = ""
+				successorIdentifier = -1
+				successorHandler = nil
+
+				// search for a new successor(?) TODO
+
 			} else {
 				fmt.Println("Successor's heartbeat reply: ", reply.Val)
 			}
-
+		}
+		if predecessorHandler != nil {
 			// check predecessor
-			err = predecessorHandler.Call("ChordService.Heartbeat", &msg, &reply)
+			err := predecessorHandler.Call("ChordService.Heartbeat", &msg, &reply)
 			if err != nil {
 				fmt.Println("Predecessor is DEAD!")
+				predecessorAddress = ""
+				predecessorIdentifier = -1
+				predecessorHandler = nil
+
+				// search for a new predecessor (?) TODO
 			} else {
 				fmt.Println("Predecessor's heartbeat reply: ", reply.Val)
 			}
@@ -368,6 +380,9 @@ func getIdentifier(key string) int64 {
 * Checks if an identifier iden lies between this node and its successor
 */
 func betweenIdentifiers(iden int64) bool {
+  if successorIdentifier == -1 {
+  	return false
+  }
   if successorIdentifier < nodeIdentifier {
     if iden > nodeIdentifier && iden > successorIdentifier {
       return true
