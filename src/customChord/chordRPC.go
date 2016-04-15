@@ -14,9 +14,7 @@ import (
 )
 
 type (
-
-
-	ChordService int 		// type for rpc
+	ChordService int 
 
 	Msg struct {
 		SourceAddress 		string 				// source address
@@ -30,7 +28,6 @@ type (
 		Key 				string
 		Val 				string
 	}
-
 )
 
 var (
@@ -44,6 +41,8 @@ var (
 	predecessorAddress		string
 	m 						float64
 	rpcChain				chan string
+	successorHandler		*rpc.Client
+	predecessorHandler		*rpc.Client
 )
 
 func main () {
@@ -94,6 +93,8 @@ func main () {
 		printFingerTable()
 	}
 
+	go manageHeartbeats()
+
 	for {
 		runtime.Gosched()
 	}
@@ -143,13 +144,14 @@ func (this *ChordService) GetKeyInfo(msg *Msg, reply *Reply) error {
 		// set new node as my successor and predecessor
 		successorAddress = msg.SourceAddress
 		successorIdentifier = getIdentifier(msg.SourceAddress)
+		successorHandler = getRpcHandler(successorAddress)
 		predecessorAddress = msg.SourceAddress
 		predecessorIdentifier = getIdentifier(msg.SourceAddress)
+		predecessorHandler = getRpcHandler(predecessorAddress)
 		ftab[nodeIdentifier+1] = msg.SourceAddress
 
 		populateFingerTable()
 		printFingerTable()
-
 	} else if msg.KeyIdentifier == nodeIdentifier {
 		// looking for me
 		fmt.Println("Someone inquired about my identifier. Sending info back.")
@@ -183,6 +185,7 @@ func (this *ChordService) GetKeyInfo(msg *Msg, reply *Reply) error {
 			// change my successor and update finger table entry
 			successorAddress = msg.SourceAddress
 			successorIdentifier = getIdentifier(msg.SourceAddress)
+			successorHandler = getRpcHandler(successorAddress)
 			ftab[nodeIdentifier+1] = msg.SourceAddress
 			reply.Val = "Accepted in the family"
 		} else {
@@ -201,10 +204,16 @@ func (this *ChordService) GetKeyInfo(msg *Msg, reply *Reply) error {
 
 }
 
+func (this *ChordService) Heartbeat(msg *Msg, reply *Reply) error {
+	reply.Val = "Alive" + " : " + nodeAddress
+	return nil
+}
+
 func (this *ChordService) SetPredecessor(msg *Msg, reply *Reply) error {
 	fmt.Println("Updating predecessor to: ", msg.Val)
 	predecessorAddress = msg.Val
 	predecessorIdentifier = getIdentifier(msg.Val)
+	predecessorHandler = getRpcHandler(predecessorAddress)
 	reply.Val = "Okay"
 	//populateFingerTable()
 	//printFingerTable()
@@ -215,6 +224,7 @@ func (this *ChordService) SetSuccessor(msg *Msg, reply *Reply) error {
 	fmt.Println("Updating successor to: ", msg.Val)
 	successorAddress = msg.Val
 	successorIdentifier = getIdentifier(msg.Val)
+	successorHandler = getRpcHandler(successorAddress)
 	// adjust finger table
 	ftab[nodeIdentifier+1] = msg.Val
 	//populateFingerTable()
@@ -227,6 +237,32 @@ func (this *ChordService) SetSuccessor(msg *Msg, reply *Reply) error {
 //////////////////////////////////////////////////////
 /*				RPC FUNCTIONS (INBOUND) END			*/
 //////////////////////////////////////////////////////
+
+func manageHeartbeats() {
+	var reply Reply
+	msg := Msg{}
+
+	for {
+		if successorHandler != nil && predecessorHandler != nil {
+			// check successor
+			err := successorHandler.Call("ChordService.Heartbeat", &msg, &reply)
+			if err != nil {
+				fmt.Println("Successor is DEAD!")
+			} else {
+				fmt.Println("Successor's heartbeat reply: ", reply.Val)
+			}
+
+			// check predecessor
+			err = predecessorHandler.Call("ChordService.Heartbeat", &msg, &reply)
+			if err != nil {
+				fmt.Println("Predecessor is DEAD!")
+			} else {
+				fmt.Println("Predecessor's heartbeat reply: ", reply.Val)
+			}
+		}
+		time.Sleep(5 * time.Second)
+	}
+}
 
 /* 
 * Set up the listener for RPC requests, serve the connections when required.
