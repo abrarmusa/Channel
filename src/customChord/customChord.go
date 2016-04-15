@@ -149,8 +149,6 @@ func askIfAlive(timeout chan bool, addr string) {
     timeout <- true
 }
 
-// TODO: USE time.After instead of time.Sleep
-
 /*
 * Heartbeat handlers which periodically send heartbeat messages to both successor and predecessor
 */
