@@ -93,11 +93,8 @@ func main () {
 		predecessorAddress = ""
 	} else {
 		fmt.Printf("Connecting to peer %s\n", peerAddress)
-		// start communicating with starter node
-		// find successor
-		// find predecessor
 
-		// send GetKeyInfo message for type node to get discovered
+		// send GetKeyInfo message to peer node to get discovered
 		var reply Reply
 		msg := Msg {nodeAddress, nodeAddress, nodeIdentifier, "node", ""}
 		handler := getRpcHandler(peerAddress)
@@ -134,8 +131,8 @@ func main () {
 
 func (this *ChordService) GetKeyInfo(msg *Msg, reply *Reply) error {
 	var str string
-	// str = fmt.Sprintf("Received GetKeyInfo message: %s\n", msg)
-	// sectionedPrint(str)
+	 str = fmt.Sprintf("Received GetKeyInfo message: %s\n", msg)
+	 sectionedPrint(str)
 	// check if key's identifier lies between me and my successor
 		// if it does then:
 			// if the key is a node then it falls between me and my successor (updates required - node join)
@@ -455,15 +452,19 @@ func populateFingerTable() {
 	for i := 0; i < int(m); i++ {
 		key := int64( math.Mod( float64(nodeIdentifier) + math.Pow(2, float64(i)), math.Pow(2, float64(m)) ) )
 
-		var reply Reply
-		msg := Msg {nodeAddress, "", key, "ftab", ""}
-		handler := getRpcHandler(successorAddress)
-		err := handler.Call("ChordService.GetKeyInfo", &msg, &reply)
-		checkError(err)
-		str = fmt.Sprintf("Reply received for entry %d in ftab: %s\n", key, reply.Val)
-		sectionedPrint(str)
+		if betweenIdentifiers(key) {
+			ftab[key] = successorAddress
+		} else {
+			var reply Reply
+			msg := Msg {nodeAddress, "", key, "ftab", ""}
+			handler := getRpcHandler(successorAddress)
+			err := handler.Call("ChordService.GetKeyInfo", &msg, &reply)
+			checkError(err)
+			str = fmt.Sprintf("Reply received for entry %d in ftab: %s\n", key, reply.Val)
+			sectionedPrint(str)
 
-		ftab[key] = reply.Val
+			ftab[key] = reply.Val
+		}
 	}
 
 }
@@ -490,33 +491,21 @@ func getRpcHandler(rpcAddr string) (*rpc.Client) {
 /*
 * Sends to next best candidate for finding KeyIdentifier by searching through finger table
 */
-func sendToNextBestNode(msg *Msg) {	// TODO: Just passing along the chain for now *BUG*
+func sendToNextBestNode(msg *Msg) {
 	var closestNode string
-	//var maxIden int64 = -1
-	// minDistanceSoFar := int64(math.MaxInt64)
-	// for nodeIden, nodeAddr := range ftab {
-	//   if nodeAddr == "unstable" {
-	//   	continue
-	//   }
-	//   diff := nodeIden - msg.KeyIdentifier
-	//   if diff < minDistanceSoFar {
-	//     minDistanceSoFar = diff
-	//     closestNode = nodeAddr
-	//   }
-	// }
+	var maxIden int64 = -1
 
 	// select largest iden in ftab less than msg.KeyIdentifier
-	// for nodeIden, nodeAddr := range ftab {
-	// 	if nodeIden > maxIden && nodeIden < msg.KeyIdentifier {
-	// 		maxIden = nodeIden
-	// 		closestNode = nodeAddr
-	// 	}	
-	// }
-	//if closestNode == "" || closestNode == nodeAddress {
-		closestNode = successorAddress
-	//}
-	// send message to closestNode - rpc outbound call TODO
-	// (?) Always GetKeyInfo service (?)
+	for nodeIden, nodeAddr := range ftab {
+		if nodeIden > maxIden && nodeIden < msg.KeyIdentifier {
+			maxIden = nodeIden
+			closestNode = nodeAddr
+		}	
+	}
+	if closestNode == "" || closestNode == nodeAddress {
+		closestNode = predecessorAddress
+	}
+	
   	var reply Reply
 	handler := getRpcHandler(closestNode)
 	err := handler.Call("ChordService.GetKeyInfo", &msg, &reply)
