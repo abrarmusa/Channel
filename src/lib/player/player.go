@@ -6,7 +6,7 @@ import (
 	"../utility"
 	// "io/ioutil"
 	"bytes"
-	"fmt"
+	// "fmt"
 	"net/http"
 	// "time"
 	// "os/exec"
@@ -50,14 +50,12 @@ func ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-type", "video/mp4")
 	var arr []byte = []byte{}
 	b := bytes.NewBuffer([]byte{})
-	c := 0
 	for tmp := range ByteChan {
 		arr = append(arr, tmp)
 		if len(arr) == 4096 {
 			b.Write(arr)
 			arr = []byte{}
 			_, err := b.WriteTo(w)
-			fmt.Printf("\r%s", r.Header, "\nrSending 4096 bytes. Sequence number is %d", c)
 			if err != nil {
 				colorprint.Debug("err")
 			}
