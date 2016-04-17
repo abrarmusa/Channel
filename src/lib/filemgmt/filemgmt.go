@@ -197,6 +197,8 @@ func AddVidSegIntoFileSys(filename string, segNums int64, vidSeg utility.VidSegm
 		localFileSys.Unlock()
 
 	}
+	foldername := procName(filename)
+	writeToFileHelper(foldername, vidSeg.Id, vidSeg.Body)
 	// colorprint.Debug("UNLOCK")
 }
 
