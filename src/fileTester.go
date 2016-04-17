@@ -37,10 +37,12 @@ func noder(myAddr string) {
 func main() {
 	vid = []byte{}
 	myAddr := os.Args[1]
-	if os.Args[2] == "2" {
-		noder(myAddr)
-	} else {
-		localFileSys := transfer.Initialize(myAddr)
+	peerAddr := os.Args[2]
+
+	// if os.Args[2] == "2" {
+	// 	noder(myAddr)
+	// } else {
+		localFileSys := transfer.Initialize(myAddr, ":1234")
 		filemgmt.ProcessLocalFiles(localFileSys)
 		fmt.Println("HEKK")
 		filemgmt.PrintFileSysContents(localFileSys)
@@ -55,17 +57,19 @@ func main() {
 			for i := 1; i <= int(segNums); i++ {
 				// fmt.Println("Getting seg ", i)
 				vidSeg := transfer.GetVideoSegment("sample1.mp4", segNums, i, ":5000")
+				transfer.SendVideoSegment("sample.mp4", peerAddr, int(segNums), vidSeg)
+				// transfer.SendVideoSegment(fname string, nodeAdd string, segNums int, segment utility.VidSegment)
+
 				// fmt.Println("got", vidSeg.Id)
 				for j := 0; j < len(vidSeg.Body); j++ {
 					// fmt.Println("Sending")
 					player.ByteChan <- vidSeg.Body[j]
 					vid = append(vid, vidSeg.Body[j])
 				}
-
 			}
 			fmt.Println("CLOSING")
 			// close(player.ByteChan)
 		}
-	}
+	//}
 
 }

@@ -120,13 +120,10 @@ func main () {
 		runtime.Gosched()
 	}
 
-	// find successor and predecessor (?)
-	// by simply connecting to system - call GetKeyInfo (?)
-
 }
 
 //////////////////////////////////////////////////////
-/*				RPC FUNCTIONS (INBOUND)				*/
+/*			RPC FUNCTIONS (INBOUND) START			*/
 //////////////////////////////////////////////////////
 
 func (this *ChordService) GetKeyInfo(msg *Msg, reply *Reply) error {
@@ -319,8 +316,6 @@ func (this *ChordService) ProposeSuccessor(msg *Msg, reply *Reply) error {
 	return nil
 }
 
-
-
 //////////////////////////////////////////////////////
 /*				RPC FUNCTIONS (INBOUND) END			*/
 //////////////////////////////////////////////////////
@@ -418,6 +413,7 @@ func manageHeartbeats() {
 				sectionedPrint(str)
 			}
 		}
+		printFingerTable()
 		time.Sleep(5 * time.Second)
 	}
 }
@@ -505,7 +501,7 @@ func sendToNextBestNode(msg *Msg) {
 	if closestNode == "" || closestNode == nodeAddress {
 		closestNode = predecessorAddress
 	}
-	
+
   	var reply Reply
 	handler := getRpcHandler(closestNode)
 	err := handler.Call("ChordService.GetKeyInfo", &msg, &reply)
