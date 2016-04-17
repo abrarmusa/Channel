@@ -62,6 +62,5 @@ func main() {
 	} else  {
 		fmt.Println("File is unavailable")
 	}
-
 	fmt.Println("Exiting...")
 }
