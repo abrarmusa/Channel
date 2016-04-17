@@ -174,7 +174,7 @@ func (service *Service) ReceiveFileSegment(seqStruct *utility.SeqStruct, segment
 	filemgmt.AddVidSegIntoFileSys(filename, int64(seqStruct.SegNums), *segment, &localFileSys)
 	outputstr += ("\nSegment " + strconv.Itoa(segment.Id) + " received for " + filename)
 	colorprint.Warning(outputstr)
-	// localFileSys.Unlock()
+	//localFileSys.Unlock()
 	colorprint.Warning("Video Segment saved on the node")
 	return nil
 }
