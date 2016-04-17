@@ -21,7 +21,7 @@ func main() {
 	vid = []byte{}
 
 	if len(os.Args) < 4 {
-		fmt.Printf("Usage : go run main.go <nodeAddress> <peerAddress0>")
+		fmt.Printf("Usage : go run main.go <nodeAddress> <peerAddress0> <peerAddress1>")
 		os.Exit(-1)
 	}
 
