@@ -1,19 +1,19 @@
 package main
 
 import (
+	"./lib/filemgmt"
 	"./lib/player"
 	"./lib/transfer"
-	"./lib/filemgmt"
+	"bufio"
 	"fmt"
 	"os"
-	"bufio"
 )
 
 var (
-	nodeAddress string
+	nodeAddress  string
 	peerAddress0 string
 	peerAddress1 string
-	vid []byte
+	vid          []byte
 )
 
 func main() {
@@ -50,16 +50,15 @@ func main() {
 		for i := 1; i <= int(segNums); i++ {
 			// get video segment from peer0
 			vidSeg := transfer.GetVideoSegment("sample1.mp4", segNums, i, peerAddress0)
-
 			// send video segment to peer1
 			transfer.SendVideoSegment("sample1.mp4", peerAddress1, int(segNums), vidSeg)
 
 			for j := 0; j < len(vidSeg.Body); j++ {
-					player.ByteChan <- vidSeg.Body[j]
-					vid = append(vid, vidSeg.Body[j])
+				player.ByteChan <- vidSeg.Body[j]
+				vid = append(vid, vidSeg.Body[j])
 			}
 		}
-	} else  {
+	} else {
 		fmt.Println("File is unavailable")
 	}
 	fmt.Println("Exiting...")

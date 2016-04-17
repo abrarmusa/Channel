@@ -170,6 +170,7 @@ func (service *Service) ReceiveFileSegment(seqStruct *utility.SeqStruct, segment
 	colorprint.Debug("------------------------------------------------------------------")
 	colorprint.Debug(">> " + t + "  <<")
 	colorprint.Debug("INBOUND RPC REQUEST: Receiving video segment for " + seqStruct.Filename)
+	// localFileSys.Lock()
 	filemgmt.AddVidSegIntoFileSys(filename, int64(seqStruct.SegNums), *segment, &localFileSys)
 	outputstr += ("\nSegment " + strconv.Itoa(segment.Id) + " received for " + filename)
 	colorprint.Warning(outputstr)
@@ -241,7 +242,7 @@ func CheckFileAvailability(filename string, nodeadd string) (bool, int64, []int6
 //
 func GetVideoSegment(fname string, segNums int64, segId int, nodeAdd string) utility.VidSegment {
 	nodeService, err := rpc.Dial(consts.TransProtocol, nodeAdd)
-	utility.CheckError(err)
+	// utility.CheckError(err)
 	waitstr := "."
 	counter, incrementer := 0, 1
 	if err != nil {
@@ -260,7 +261,6 @@ func GetVideoSegment(fname string, segNums int64, segId int, nodeAdd string) uti
 			}
 		}
 		nodeService, err = rpc.Dial(consts.TransProtocol, nodeAdd)
-		utility.CheckError(err)
 	}
 
 	prog.Lock()
@@ -313,9 +313,7 @@ func SendVideoSegment(fname string, nodeAdd string, segNums int, segment utility
 			}
 		}
 		nodeService, err = rpc.Dial(consts.TransProtocol, nodeAdd)
-		utility.CheckError(err)
 	}
-	// utility.CheckError(err)
 	segReq := utility.SeqStruct{
 		Filename:  fname,
 		SegNums:   segNums,
