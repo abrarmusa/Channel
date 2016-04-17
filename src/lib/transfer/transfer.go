@@ -31,6 +31,7 @@ import (
 // -------------------
 // This type just holds an integer to use for registering the RPC Service
 type Service int
+
 //type FTService int
 
 // --> VidSegment <---
@@ -306,6 +307,8 @@ func SendVideoSegment(fname string, nodeAdd string, segNums int, segment utility
 		SegmentId: segment.Id,
 	}
 	err = nodeService.Call("Service.ReceiveFileSegment", segReq, &segment)
+	utility.CheckError(err)
+	err = nodeService.Close()
 	utility.CheckError(err)
 }
 
