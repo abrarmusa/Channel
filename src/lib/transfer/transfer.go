@@ -299,8 +299,23 @@ func GetVideoSegment(fname string, segNums int64, segId int, nodeAdd string) uti
 // }
 //
 func SendVideoSegment(fname string, nodeAdd string, segNums int, segment utility.VidSegment) {
+	waitstr := "."
+	counter, incrementer := 0, 1
 	nodeService, err := rpc.Dial(consts.TransProtocol, nodeAdd)
-	utility.CheckError(err)
+	for err != nil {
+		counter++
+		if (counter % 100) == 0 {
+			fmt.Printf("\rAll ports are blocked. Waiting for port to clear%s                          ", waitstr)
+			waitstr += "."
+			incrementer++
+			if (incrementer % 300) == 0 {
+				waitstr += "."
+			}
+		}
+		nodeService, err = rpc.Dial(consts.TransProtocol, nodeAdd)
+		utility.CheckError(err)
+	}
+	// utility.CheckError(err)
 	segReq := utility.SeqStruct{
 		Filename:  fname,
 		SegNums:   segNums,
@@ -310,6 +325,7 @@ func SendVideoSegment(fname string, nodeAdd string, segNums int, segment utility
 	utility.CheckError(err)
 	err = nodeService.Close()
 	utility.CheckError(err)
+
 }
 
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
