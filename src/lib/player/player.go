@@ -91,7 +91,7 @@ func Run() {
 	ByteChan = make(chan byte, consts.WindowSize*100000)
 	CloseStream = make(chan int)
 	http.HandleFunc("/", ServeHTTP)
-	go http.ListenAndServe(":8080", nil)
+	http.ListenAndServe(":8080", nil)
 	// colorprint.Blue("The video " + Filename + " is streaming at http://localhost:8080/" + Filename)
 	// switch runtime.GOOS {
 	// case "linux":
