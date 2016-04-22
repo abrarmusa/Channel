@@ -1,0 +1,37 @@
+Ignore
+:1432 {":1432":1}
+Initialization Complete
+:1432 {":1432":2}
+Stabilized position in ID circle
+:1432 {":1432":3, ":1111":2}
+Received RPC request
+:1432 {":1432":4, ":1111":2}
+Replying to RPC call
+:1432 {":1432":5, ":1111":2}
+Calling ChordService.SetPredecessor
+:1432 {":1432":6, ":1111":4}
+Received ChordService.SetPredecessor reply
+:1432 {":1432":7, ":1111":4}
+Calling ChordService.SetSuccessor
+:1432 {":1432":8, ":1111":6}
+Received ChordService.SetSuccessor reply
+:1432 {":1432":9, ":1111":6}
+Lost track of successor
+:1432 {":1432":10, ":1111":6}
+Lost track of immediate predecessor
+:1111 {":1111":1}
+Initialization Complete
+:1111 {":1111":2}
+Calling ChordService.GetKeyInfo
+:1111 {":1111":3, ":1432":5}
+Received RPC request
+:1111 {":1111":4, ":1432":5}
+Replying to RPC call
+:1111 {":1111":5, ":1432":7}
+Received RPC request
+:1111 {":1111":6, ":1432":7}
+Replying to RPC call
+:1111 {":1111":7, ":1432":7}
+Received ChordService.GetKeyInfo reply
+:1111 {":1111":8, ":1432":7}
+Stabilized position in ID circle
