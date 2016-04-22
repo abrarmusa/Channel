@@ -11,6 +11,7 @@ import (
   	"encoding/hex"
   	"runtime"
   	"time"
+    gov "github.com/arcaneiceman/GoVector/govec"
 )
 
 type (
@@ -19,8 +20,8 @@ type (
 	ChordService int
 
 	// Message struct to be used as input argument in rpc calls
-	Msg struct {				
-		SourceAddress 		string 				
+	Msg struct {
+		SourceAddress 		string
 		Key 				string
 		KeyIdentifier 		int64
 		KeyType 			string 				// stores inquired key's type (e.g "node" if a node wishes to join)
@@ -33,15 +34,18 @@ type (
 		Val 				string
 	}
 
+  Vec struct {
+  Content, RealTimestamp string
+}
 )
 
 var (
 	nodeAddress				string 				// rpc address this node listens on
 	peerAddress 			string 				// another node's address to connect to
-	nodeIdentifier 			int64 			
+	nodeIdentifier 			int64
 	successorIdentifier 	int64
 	predecessorIdentifier	int64
-	successorAddress		string	
+	successorAddress		string
 	predecessorAddress		string
 
 	// finger table as map of identifiers and addresses
@@ -52,8 +56,26 @@ var (
 	predecessorHandler		*rpc.Client
 
 	m 						float64				// decides the size of the identifier circle (2 ^ m values)
+  Logger *gov.GoLog // govec
 
 )
+
+func launchUDPGoVecListener(src string) {
+  conn, _ := net.ListenPacket("udp", src)
+
+  var buf [512]byte
+
+  for {
+    n, addr, _ := conn.ReadFrom(buf[0:])
+    incommingMessage := new(Vec)
+    Logger.UnpackReceive("Received Message From Client", buf[0:n], &incommingMessage)
+
+    outgoingMessage := Vec{"GoVecs Great?", time.Now().String()}
+    conn.WriteTo(Logger.PrepareSend("Replying to client", outgoingMessage), addr)
+    time.Sleep(1)
+  }
+  conn.Close()
+}
 
 func main () {
 
@@ -84,7 +106,13 @@ func main () {
 	// initialize finger table
 	ftab = make(map[int64]string)
 
+  // govec stuff
+  logName := "NodeLog-" + string(nodeIdentifier) + "-" + time.Now().String()
+  Logger = gov.Initialize(nodeAddress, logName)
+
 	go launchRPCService()
+
+  go launchUDPGoVecListener(nodeAddress)
 
 	if nodeAddress == peerAddress {
 		str := fmt.Sprintf("First node %s joining the system\n", nodeAddress)
@@ -98,9 +126,21 @@ func main () {
 		var reply Reply
 		msg := Msg {nodeAddress, nodeAddress, nodeIdentifier, "node", ""}
 		handler := getRpcHandler(peerAddress)
+
+    conn := setupConnection(peerAddress, nodeAddress)
+    outgoingMessage := Vec{"Hello GoVec!", time.Now().String()}
+    outBuf := Logger.PrepareSend("Sending message to server", outgoingMessage)
+    _, _ = conn.Write(outBuf)
+
 		err := handler.Call("ChordService.GetKeyInfo", &msg, &reply)
 		checkError(err)
 		fmt.Printf("Reply received for GetKeyInfo: %s\n", reply.Val)
+
+    var inBuf [512]byte
+    n, _ := conn.Read(inBuf[0:])
+    incommingMessage := new(Vec)
+    Logger.UnpackReceive("Received Message from server", inBuf[0:n], &incommingMessage)
+    conn.Close()
 
 		// wait to get successor and predecessor
 		for successorAddress == "" || predecessorAddress == "" {
@@ -114,6 +154,8 @@ func main () {
 		printFingerTable()
 	}
 
+  Logger.LogLocalEvent("Stabilized position in ID circle")
+
 	go manageHeartbeats()
 
 	for {
@@ -125,97 +167,97 @@ func main () {
 //////////////////////////////////////////////////////
 /*			RPC FUNCTIONS (INBOUND) START			*/
 //////////////////////////////////////////////////////
-
 func (this *ChordService) GetKeyInfo(msg *Msg, reply *Reply) error {
-	var str string
-	 str = fmt.Sprintf("Received GetKeyInfo message: %s\n", msg)
-	 sectionedPrint(str)
-	// check if key's identifier lies between me and my successor
-		// if it does then:
-			// if the key is a node then it falls between me and my successor (updates required - node join)
-			// if the key is a file then reply with successor's address cause it holds the file
-		// else forward to next best node in our finger table (closest to key's identifier/max identifer in ftab less than key's identifier)
-	if successorAddress == "" && predecessorAddress == "" {
-		// only node in system - deal accordingly
-		// ask new node to set me as a successor and a predecessor
-		//fmt.Println("Found another node. Not lonely anymore")
-		var reply Reply
-		msg0 := Msg {nodeAddress, "", -1, "", nodeAddress}
-		handler := getRpcHandler(msg.SourceAddress)
-		err := handler.Call("ChordService.SetPredecessor", &msg0, &reply)
-		checkError(err)
-		err = handler.Call("ChordService.SetSuccessor", &msg0, &reply)
-		checkError(err)
-		//fmt.Printf("Reply received for SetPredecessor: %s\n",reply.Val)
-		// set new node as my successor and predecessor
-		successorAddress = msg.SourceAddress
-		successorIdentifier = getIdentifier(msg.SourceAddress)
-		successorHandler = getRpcHandler(successorAddress)
-		predecessorAddress = msg.SourceAddress
-		predecessorIdentifier = getIdentifier(msg.SourceAddress)
-		predecessorHandler = getRpcHandler(predecessorAddress)
-		ftab[nodeIdentifier+1] = msg.SourceAddress
+  var str string
 
-		populateFingerTable()
-		printFingerTable()
-	} else if msg.KeyIdentifier == nodeIdentifier {
-		// looking for me
-		sectionedPrint("Someone inquired about my identifier. Sending info back.")
-		reply.Val = nodeAddress
-	} else if addr, ok := ftab[msg.KeyIdentifier]; ok {
-    	if msg.KeyType == "node" {
-    		str = fmt.Sprintf("NewComer node %s clashing with already existent node %s\n", msg.SourceAddress, addr)
-    		sectionedPrint(str)
-    	} else {
-    		str = fmt.Sprintf("Inquired entry %d already in finger table. Returning address %s\n", msg.KeyIdentifier, addr)
-    		sectionedPrint(str)
-    		reply.Val = addr
-    	}
-	} else if betweenIdentifiers(msg.KeyIdentifier) {
-		if msg.KeyType == "node" {
-			// ask new node to select me as its predecessor and my old successor as its successor TODO
-			// Need: SetPredecessor(), SetSuccessor() - make rpc calls
-			//fmt.Println("BETWEEN ME AND MY successor")
-			var reply Reply
-			msg0 := Msg {nodeAddress, "", -1, "", nodeAddress}
-			handler := getRpcHandler(msg.SourceAddress)
-			err := handler.Call("ChordService.SetPredecessor", &msg0, &reply)
-			checkError(err)
-			//fmt.Printf("Reply received for SetPredecessor: %s\n",reply.Val)
+   str = fmt.Sprintf("Received GetKeyInfo message: %s\n", msg)
+   sectionedPrint(str)
+  // check if key's identifier lies between me and my successor
+    // if it does then:
+      // if the key is a node then it falls between me and my successor (updates required - node join)
+      // if the key is a file then reply with successor's address cause it holds the file
+    // else forward to next best node in our finger table (closest to key's identifier/max identifer in ftab less than key's identifier)
+  if successorAddress == "" && predecessorAddress == "" {
+    // only node in system - deal accordingly
+    // ask new node to set me as a successor and a predecessor
+    //fmt.Println("Found another node. Not lonely anymore")
+    var reply Reply
+    msg0 := Msg {nodeAddress, "", -1, "", nodeAddress}
+    handler := getRpcHandler(msg.SourceAddress)
+    err := handler.Call("ChordService.SetPredecessor", &msg0, &reply)
+    checkError(err)
+    err = handler.Call("ChordService.SetSuccessor", &msg0, &reply)
+    checkError(err)
+    //fmt.Printf("Reply received for SetPredecessor: %s\n",reply.Val)
+    // set new node as my successor and predecessor
+    successorAddress = msg.SourceAddress
+    successorIdentifier = getIdentifier(msg.SourceAddress)
+    successorHandler = getRpcHandler(successorAddress)
+    predecessorAddress = msg.SourceAddress
+    predecessorIdentifier = getIdentifier(msg.SourceAddress)
+    predecessorHandler = getRpcHandler(predecessorAddress)
+    ftab[nodeIdentifier+1] = msg.SourceAddress
 
-			msg0 = Msg {nodeAddress, "", -1, "", successorAddress}
-			handler = getRpcHandler(msg.SourceAddress)
-			err = handler.Call("ChordService.SetSuccessor", &msg0, &reply)
-			checkError(err)
-			//fmt.Printf("Reply received for SetSuccessor: %s\n",reply.Val)
+    populateFingerTable()
+    printFingerTable()
+  } else if msg.KeyIdentifier == nodeIdentifier {
+    // looking for me
+    sectionedPrint("Someone inquired about my identifier. Sending info back.")
+    reply.Val = nodeAddress
+  } else if addr, ok := ftab[msg.KeyIdentifier]; ok {
+      if msg.KeyType == "node" {
+        str = fmt.Sprintf("NewComer node %s clashing with already existent node %s\n", msg.SourceAddress, addr)
+        sectionedPrint(str)
+      } else {
+        str = fmt.Sprintf("Inquired entry %d already in finger table. Returning address %s\n", msg.KeyIdentifier, addr)
+        sectionedPrint(str)
+        reply.Val = addr
+      }
+  } else if betweenIdentifiers(msg.KeyIdentifier) {
+    if msg.KeyType == "node" {
+      // ask new node to select me as its predecessor and my old successor as its successor TODO
+      // Need: SetPredecessor(), SetSuccessor() - make rpc calls
+      //fmt.Println("BETWEEN ME AND MY successor")
+      var reply Reply
+      msg0 := Msg {nodeAddress, "", -1, "", nodeAddress}
+      handler := getRpcHandler(msg.SourceAddress)
+      err := handler.Call("ChordService.SetPredecessor", &msg0, &reply)
+      checkError(err)
+      //fmt.Printf("Reply received for SetPredecessor: %s\n",reply.Val)
 
-			// ask my old successor to select new node as its predecessor TODO
-			// Need: SetPredecessor() - make rpc call
-			msg0 = Msg {nodeAddress, "", -1, "", msg.SourceAddress}
-			handler = getRpcHandler(successorAddress)
-			err = handler.Call("ChordService.SetPredecessor", &msg0, &reply)
-			checkError(err)
-			//fmt.Printf("Reply received for SetPredecessor: %s\n",reply.Val)			
+      msg0 = Msg {nodeAddress, "", -1, "", successorAddress}
+      handler = getRpcHandler(msg.SourceAddress)
+      err = handler.Call("ChordService.SetSuccessor", &msg0, &reply)
+      checkError(err)
+      //fmt.Printf("Reply received for SetSuccessor: %s\n",reply.Val)
 
-			// change my successor and update finger table entry
-			successorAddress = msg.SourceAddress
-			successorIdentifier = getIdentifier(msg.SourceAddress)
-			successorHandler = getRpcHandler(successorAddress)
-			ftab[nodeIdentifier+1] = msg.SourceAddress
-			reply.Val = "Accepted in the family"
-		} else {
-			// file or ftab population inquiry - simply send successor's address
-			//fmt.Println("Between me and my successor: File or ftab inquiry received")
-			//fmt.Printf("successorIden: %d\npredecessorIden: %d\n", successorIdentifier, predecessorIdentifier)
-			//fmt.Println("Message: ", msg)
-			reply.Val = successorAddress
-		}
-	} else {
-		// send to next best node
-		sendToNextBestNode(msg)
-		reply.Val = <- rpcChain
-	}
-	return nil
+      // ask my old successor to select new node as its predecessor TODO
+      // Need: SetPredecessor() - make rpc call
+      msg0 = Msg {nodeAddress, "", -1, "", msg.SourceAddress}
+      handler = getRpcHandler(successorAddress)
+      err = handler.Call("ChordService.SetPredecessor", &msg0, &reply)
+      checkError(err)
+      //fmt.Printf("Reply received for SetPredecessor: %s\n",reply.Val)
+
+      // change my successor and update finger table entry
+      successorAddress = msg.SourceAddress
+      successorIdentifier = getIdentifier(msg.SourceAddress)
+      successorHandler = getRpcHandler(successorAddress)
+      ftab[nodeIdentifier+1] = msg.SourceAddress
+      reply.Val = "Accepted in the family"
+    } else {
+      // file or ftab population inquiry - simply send successor's address
+      //fmt.Println("Between me and my successor: File or ftab inquiry received")
+      //fmt.Printf("successorIden: %d\npredecessorIden: %d\n", successorIdentifier, predecessorIdentifier)
+      //fmt.Println("Message: ", msg)
+      reply.Val = successorAddress
+    }
+  } else {
+    // send to next best node
+    sendToNextBestNode(msg)
+    reply.Val = <- rpcChain
+  }
+  return nil
 
 }
 
@@ -297,7 +339,7 @@ func (this *ChordService) ProposeSuccessor(msg *Msg, reply *Reply) error {
 	if successorAddress == "" {
 		// accept proposal
 		successorAddress = msg.Val
-		successorIdentifier = getIdentifier(msg.Val) 
+		successorIdentifier = getIdentifier(msg.Val)
 		successorHandler = getRpcHandler(predecessorAddress)
 
 		// set accepted node's predecessor to this node
@@ -418,7 +460,7 @@ func manageHeartbeats() {
 	}
 }
 
-/* 
+/*
 * Set up the listener for RPC requests, serve the connections when required.
 */
 func launchRPCService() {
@@ -478,7 +520,7 @@ func getRpcHandler(rpcAddr string) (*rpc.Client) {
 	var nodeRPCHandler *rpc.Client
 	//fmt.Println("Dialing address: ", rpcAddr)
 	nodeRPCHandler, err := rpc.Dial("tcp", rpcAddr)
-	
+
 	checkError(err)
 	//defer nodeRPCHandler.Close()
 	return nodeRPCHandler
@@ -496,7 +538,7 @@ func sendToNextBestNode(msg *Msg) {
 		if nodeIden > maxIden && nodeIden < msg.KeyIdentifier {
 			maxIden = nodeIden
 			closestNode = nodeAddr
-		}	
+		}
 	}
 	if closestNode == "" || closestNode == nodeAddress {
 		closestNode = predecessorAddress
@@ -590,4 +632,19 @@ func printFingerTable() {
     fmt.Printf("| %3d  | %9s |\n", id, ftab[id])
   }
   fmt.Println(" -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ ")
+}
+
+func setupConnection(sending, listening string) *net.UDPConn {
+  listening += "0"
+  rAddr, errR := net.ResolveUDPAddr("udp4", sending)
+  checkError(errR)
+  lAddr, errL := net.ResolveUDPAddr("udp4", listening)
+  checkError(errL)
+
+  conn, errDial := net.DialUDP("udp", lAddr, rAddr)
+  checkError(errDial)
+  if (errR == nil) && (errL == nil) && (errDial == nil) {
+    return conn
+  }
+  return nil
 }
