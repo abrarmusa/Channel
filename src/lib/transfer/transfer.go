@@ -142,6 +142,7 @@ func (service *Service) GetFileSegment(segReq *utility.ReqStruct, segment *utili
 
 // This method answers to an rpc to save a video segment locally into the local filesystem
 func (service *Service) ReceiveFileSegment(seqStruct *utility.SeqStruct, segment *utility.VidSegment) error {
+	fmt.Println("SS")
 	filename := seqStruct.Filename
 	t := time.Now().String()
 	outputstr := ""
@@ -150,7 +151,7 @@ func (service *Service) ReceiveFileSegment(seqStruct *utility.SeqStruct, segment
 	colorprint.Debug("INBOUND RPC REQUEST: Receiving video segment for " + seqStruct.Filename)
 	// localFileSys.Lock()
 	filemgmt.AddVidSegIntoFileSys(filename, int64(seqStruct.SegNums), seqStruct.Segment, &localFileSys)
-	outputstr += ("\nSegment " + strconv.Itoa(segment.Id) + " received for " + filename)
+	outputstr += ("\nSegment " + strconv.Itoa(seqStruct.Segment.Id) + " received for " + filename)
 	colorprint.Warning(outputstr)
 	//localFileSys.Unlock()
 	colorprint.Warning("Video Segment saved on the node")
@@ -265,7 +266,7 @@ func GetVideoSegment(fname string, segNums int64, segId int, nodeAdd string) uti
 // }
 //
 func SendVideoSegment(fname string, nodeAdd string, segNums int, segment utility.VidSegment) {
-	colorprint.Blue("Sending segment " + strconv.Itoa(segment.Id))
+	fmt.Printf("\rSending segment " + strconv.Itoa(segment.Id))
 	waitstr := "."
 	counter, incrementer := 0, 1
 	nodeService, err := rpc.Dial(consts.TransProtocol, nodeAdd)
@@ -287,7 +288,6 @@ func SendVideoSegment(fname string, nodeAdd string, segNums int, segment utility
 		SegmentId: segment.Id,
 		Segment:   segment,
 	}
-	fmt.Println(segment.Id, len(segment.Body))
 	err = nodeService.Call("Service.ReceiveFileSegment", segReq, &segment)
 	utility.CheckError(err)
 	err = nodeService.Close()
