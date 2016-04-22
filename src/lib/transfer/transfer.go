@@ -8,7 +8,6 @@ import (
 	"../ui"
 	"../utility"
 	"errors"
-	//"io/ioutil"
 	"fmt"
 	"log"
 	"net"
@@ -16,7 +15,6 @@ import (
 	"strconv"
 	"sync"
 	"time"
-	//"strings"
 )
 
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -25,19 +23,11 @@ import (
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-// --> Service <---
-// ----------------
-// DESCRIPTION:
-// -------------------
 // This type just holds an integer to use for registering the RPC Service
 type Service int
 
 //type FTService int
 
-// --> VidSegment <---
-// -------------------
-// DESCRIPTION:
-// -------------------
 // This struct holds a bool and a lock to determine when a rpc.Dial method is waiting for ports to clear up
 type Progress struct {
 	show bool
@@ -64,10 +54,6 @@ var prog Progress = Progress{
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-// (service *Service) localFileAvailability(filename string, response *utilty.Response) error
-// -----------------------------------------------------------------------------------
-// DESCRIPTION:
-// -------------------
 // This method responds to an rpc Call for a particular segment of a file. It first looks up and checks if the video file is available. If
 // the file is available, it continues on to see if the segment is available. If the segment is available, it returns a response with the utility.VidSegment.
 // In case of unavailability, it will either return an error saying "utility.File Unavailable." or "Segment unavailable." depending on what was unavailable.
@@ -121,10 +107,6 @@ func (service *Service) LocalFileAvailability(filename string, response *utility
 // 	return err
 // }
 
-// (service *Service) GetFileSegment(segReq *utility.ReqStruct, segment *utility.VidSegment) error <--
-// ----------------------------------------------------------------------------------
-// DESCRIPTION:
-// -------------------
 // This method responds to an rpc Call for a particular segment of a file. It first looks up and checks if the video file is available. If the
 // file is available, it continues on to see if the segment is available. If the segment is available, it returns a response with the utility.VidSegment.
 // In case of unavailability, it will either return an error saying "utility.File Unavailable." or "Segment unavailable." depending on what was unavailable.
@@ -158,12 +140,9 @@ func (service *Service) GetFileSegment(segReq *utility.ReqStruct, segment *utili
 	return nil
 }
 
-// (service *Service) ReceiveFileSegment(seqStruct utility.SeqStruct, segment *utility.VidSegment)
-// ----------------------------------------------------------------------------------
-// DESCRIPTION:
-// -------------------
 // This method answers to an rpc to save a video segment locally into the local filesystem
 func (service *Service) ReceiveFileSegment(seqStruct *utility.SeqStruct, segment *utility.VidSegment) error {
+	fmt.Println("SS")
 	filename := seqStruct.Filename
 	t := time.Now().String()
 	outputstr := ""
@@ -171,8 +150,8 @@ func (service *Service) ReceiveFileSegment(seqStruct *utility.SeqStruct, segment
 	colorprint.Debug(">> " + t + "  <<")
 	colorprint.Debug("INBOUND RPC REQUEST: Receiving video segment for " + seqStruct.Filename)
 	// localFileSys.Lock()
-	filemgmt.AddVidSegIntoFileSys(filename, int64(seqStruct.SegNums), *segment, &localFileSys)
-	outputstr += ("\nSegment " + strconv.Itoa(segment.Id) + " received for " + filename)
+	filemgmt.AddVidSegIntoFileSys(filename, int64(seqStruct.SegNums), seqStruct.Segment, &localFileSys)
+	outputstr += ("\nSegment " + strconv.Itoa(seqStruct.Segment.Id) + " received for " + filename)
 	colorprint.Warning(outputstr)
 	//localFileSys.Unlock()
 	colorprint.Warning("Video Segment saved on the node")
@@ -185,10 +164,6 @@ func (service *Service) ReceiveFileSegment(seqStruct *utility.SeqStruct, segment
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-// checkFileAvailability(filename string, nodeadd string, nodeService *rpc.Client) (bool, int64, []int64)
-// --------------------------------------------------------------------------------------------
-// DESCRIPTION:
-// -------------------
 // This method calls an RPC method to another node to check if they have a video available. If it is available on the node,
 // if no errors occur in the Call, the method checks the response to see if the file is available. If it is, it reads the response
 // to obtain the map of segments and the total number of segments of the file
@@ -222,10 +197,6 @@ func CheckFileAvailability(filename string, nodeadd string) (bool, int64, []int6
 	}
 }
 
-// GetVideoSegment(fname string, segId int, nodeAdd string) utility.VidSegment
-// --------------------------------------------------------------------------------------------
-// DESCRIPTION:
-// -------------------
 // This method calls an RPC method to another node to obtain a particular segment of a video
 // -------------------
 // INSTRUCTIONS:
@@ -280,10 +251,6 @@ func GetVideoSegment(fname string, segNums int64, segId int, nodeAdd string) uti
 	return vidSeg
 }
 
-// SendVideoSegment(fname string, nodeAddr string, segment utility.VidSegment)
-// --------------------------------------------------------------------------------------------
-// DESCRIPTION:
-// -------------------
 // This method sends a utility.VidSegment to another node for saving
 // -------------------
 // INSTRUCTIONS:
@@ -299,6 +266,7 @@ func GetVideoSegment(fname string, segNums int64, segId int, nodeAdd string) uti
 // }
 //
 func SendVideoSegment(fname string, nodeAdd string, segNums int, segment utility.VidSegment) {
+	fmt.Printf("\rSending segment " + strconv.Itoa(segment.Id))
 	waitstr := "."
 	counter, incrementer := 0, 1
 	nodeService, err := rpc.Dial(consts.TransProtocol, nodeAdd)
@@ -318,6 +286,7 @@ func SendVideoSegment(fname string, nodeAdd string, segNums int, segment utility
 		Filename:  fname,
 		SegNums:   segNums,
 		SegmentId: segment.Id,
+		Segment:   segment,
 	}
 	err = nodeService.Call("Service.ReceiveFileSegment", segReq, &segment)
 	utility.CheckError(err)
@@ -332,10 +301,6 @@ func SendVideoSegment(fname string, nodeAdd string, segNums int, segment utility
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-// setUpRPC(nodeRPC string)
-// --------------------------------------------------------------------------------------------
-// DESCRIPTION:
-// -------------------
 // This method sets up the RPC connection using UDP
 func setUpRPC(nodeRPC string) {
 	rpcServ := new(Service)
@@ -388,10 +353,6 @@ func setUpRPC(nodeRPC string) {
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-// Instr(nodeRPC string)
-// --------------------------------------------------------------------------------------------
-// DESCRIPTION:
-// -------------------
 // This method responds to the user input requests
 func Instr() {
 	colorprint.Blue("Listening on " + rpcAddress + " for incoming RPC calls")
@@ -414,10 +375,6 @@ func Instr() {
 	}
 }
 
-// getHelper(nodeRPC string, nodeUDP string)
-// --------------------------------------------------------------------------------------------
-// DESCRIPTION:
-// -------------------
 // This method responds to the user input request for "get"
 func getHelper(nodeRPC string, input string, fname string, cmd string) {
 
@@ -465,10 +422,6 @@ func playHelper(fname string) {
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-// playHelper(fname string)
-// --------------------------------------------------------------------------------------------
-// DESCRIPTION:
-// -------------------
 // This method starts up the transfer rpc and also initializes the filesystem
 func Initialize(nodeRPC string, name string) *utility.FileSys {
 	if !utility.ValidIP(nodeRPC, "[node RPC ip:port]") {
@@ -476,7 +429,6 @@ func Initialize(nodeRPC string, name string) *utility.FileSys {
 		return nil
 	}
 	// ========================================
-	// localFileSys = &sync.RWMutex{}
 	progLock = &sync.RWMutex{}
 	// ========================================
 	rpcAddress = nodeRPC
