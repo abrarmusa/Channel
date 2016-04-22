@@ -1,16 +1,16 @@
 package chordRPC
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
 	"fmt"
 	"math"
+	"math/big"
 	"net"
 	"net/rpc"
 	"os"
-	"math/big"
-	"crypto/sha1"
-  	"encoding/hex"
-  	"runtime"
-  	"time"
+	"runtime"
+	"time"
 )
 
 type (
@@ -19,44 +19,43 @@ type (
 	ChordService int
 
 	// Message struct to be used as input argument in rpc calls
-	Msg struct {				
-		SourceAddress 		string 				
-		Key 				string
-		KeyIdentifier 		int64
-		KeyType 			string 				// stores inquired key's type (e.g "node" if a node wishes to join)
-		Val 				string 				// holds any value that the client wants the server to use
+	Msg struct {
+		SourceAddress string
+		Key           string
+		KeyIdentifier int64
+		KeyType       string // stores inquired key's type (e.g "node" if a node wishes to join)
+		Val           string // holds any value that the client wants the server to use
 	}
 
 	// Reply struct to be used as output argument in rpc calls
 	Reply struct {
-		Key 				string
-		Val 				string
+		Key string
+		Val string
 	}
-
 )
 
 var (
-	nodeAddress				string 				// rpc address this node listens on
-	peerAddress 			string 				// another node's address to connect to
-	ftAddr 					string 				// rpc addr for file transferring
-	nodeIdentifier 			int64 			
-	successorIdentifier 	int64
-	predecessorIdentifier	int64
-	successorAddress		string	
-	predecessorAddress		string
+	nodeAddress           string // rpc address this node listens on
+	peerAddress           string // another node's address to connect to
+	ftAddr                string // rpc addr for file transferring
+	nodeIdentifier        int64
+	successorIdentifier   int64
+	predecessorIdentifier int64
+	successorAddress      string
+	predecessorAddress    string
 
 	// finger table as map of identifiers and addresses
-	ftab 					map[int64]string
+	ftab map[int64]string
 
-	rpcChain				chan string 		// rpc chain channel to pass down value to the initiator
-	successorHandler		*rpc.Client
-	predecessorHandler		*rpc.Client
+	rpcChain           chan string // rpc chain channel to pass down value to the initiator
+	successorHandler   *rpc.Client
+	predecessorHandler *rpc.Client
 
-	m 						float64				// decides the size of the identifier circle (2 ^ m values)
+	m float64 // decides the size of the identifier circle (2 ^ m values)
 
 )
 
-func Start (nodeAddr string, peerAddr string, fileTransAddr string) {
+func Start(nodeAddr string, peerAddr string, fileTransAddr string) {
 
 	// if len(os.Args) < 3 {
 	// 	fmt.Println("=====================================================")
@@ -102,7 +101,7 @@ func Start (nodeAddr string, peerAddr string, fileTransAddr string) {
 
 		// send GetKeyInfo message to peer node to get discovered
 		var reply Reply
-		msg := Msg {nodeAddress, nodeAddress, nodeIdentifier, "node", ""}
+		msg := Msg{nodeAddress, nodeAddress, nodeIdentifier, "node", ""}
 		handler := getRpcHandler(peerAddress)
 		err := handler.Call("ChordService.GetKeyInfo", &msg, &reply)
 		checkError(err)
@@ -123,7 +122,7 @@ func Start (nodeAddr string, peerAddr string, fileTransAddr string) {
 		printFingerTable()
 	}
 
-	//go manageHeartbeats()
+	go manageHeartbeats()
 
 	for {
 		runtime.Gosched()
@@ -137,19 +136,19 @@ func Start (nodeAddr string, peerAddr string, fileTransAddr string) {
 
 func (this *ChordService) GetKeyInfo(msg *Msg, reply *Reply) error {
 	var str string
-	 str = fmt.Sprintf("Received GetKeyInfo message: %s\n", msg)
-	 sectionedPrint(str)
+	str = fmt.Sprintf("Received GetKeyInfo message: %s\n", msg)
+	sectionedPrint(str)
 	// check if key's identifier lies between me and my successor
-		// if it does then:
-			// if the key is a node then it falls between me and my successor (updates required - node join)
-			// if the key is a file then reply with successor's address cause it holds the file
-		// else forward to next best node in our finger table (closest to key's identifier/max identifer in ftab less than key's identifier)
+	// if it does then:
+	// if the key is a node then it falls between me and my successor (updates required - node join)
+	// if the key is a file then reply with successor's address cause it holds the file
+	// else forward to next best node in our finger table (closest to key's identifier/max identifer in ftab less than key's identifier)
 	if successorAddress == "" && predecessorAddress == "" {
 		// only node in system - deal accordingly
 		// ask new node to set me as a successor and a predecessor
 		//fmt.Println("Found another node. Not lonely anymore")
 		var reply Reply
-		msg0 := Msg {nodeAddress, "", -1, "", nodeAddress}
+		msg0 := Msg{nodeAddress, "", -1, "", nodeAddress}
 		handler := getRpcHandler(msg.SourceAddress)
 		err := handler.Call("ChordService.SetPredecessor", &msg0, &reply)
 		checkError(err)
@@ -176,27 +175,27 @@ func (this *ChordService) GetKeyInfo(msg *Msg, reply *Reply) error {
 		sectionedPrint("Someone inquired about my identifier. Sending info back.")
 		reply.Val = nodeAddress
 	} else if addr, ok := ftab[msg.KeyIdentifier]; ok {
-    	if msg.KeyType == "node" {
-    		str = fmt.Sprintf("NewComer node %s clashing with already existent node %s\n", msg.SourceAddress, addr)
-    		sectionedPrint(str)
-    	} else {
-    		str = fmt.Sprintf("Inquired entry %d already in finger table. Returning address %s\n", msg.KeyIdentifier, addr)
-    		sectionedPrint(str)
-    		reply.Val = addr
-    	}
+		if msg.KeyType == "node" {
+			str = fmt.Sprintf("NewComer node %s clashing with already existent node %s\n", msg.SourceAddress, addr)
+			sectionedPrint(str)
+		} else {
+			str = fmt.Sprintf("Inquired entry %d already in finger table. Returning address %s\n", msg.KeyIdentifier, addr)
+			sectionedPrint(str)
+			reply.Val = addr
+		}
 	} else if betweenIdentifiers(msg.KeyIdentifier) {
 		if msg.KeyType == "node" {
 			// ask new node to select me as its predecessor and my old successor as its successor TODO
 			// Need: SetPredecessor(), SetSuccessor() - make rpc calls
 			//fmt.Println("BETWEEN ME AND MY successor")
 			var reply Reply
-			msg0 := Msg {nodeAddress, "", -1, "", nodeAddress}
+			msg0 := Msg{nodeAddress, "", -1, "", nodeAddress}
 			handler := getRpcHandler(msg.SourceAddress)
 			err := handler.Call("ChordService.SetPredecessor", &msg0, &reply)
 			checkError(err)
 			//fmt.Printf("Reply received for SetPredecessor: %s\n",reply.Val)
 
-			msg0 = Msg {nodeAddress, "", -1, "", successorAddress}
+			msg0 = Msg{nodeAddress, "", -1, "", successorAddress}
 			handler = getRpcHandler(msg.SourceAddress)
 			err = handler.Call("ChordService.SetSuccessor", &msg0, &reply)
 			checkError(err)
@@ -204,7 +203,7 @@ func (this *ChordService) GetKeyInfo(msg *Msg, reply *Reply) error {
 
 			// ask my old successor to select new node as its predecessor TODO
 			// Need: SetPredecessor() - make rpc call
-			msg0 = Msg {nodeAddress, "", -1, "", msg.SourceAddress}
+			msg0 = Msg{nodeAddress, "", -1, "", msg.SourceAddress}
 			handler = getRpcHandler(successorAddress)
 			err = handler.Call("ChordService.SetPredecessor", &msg0, &reply)
 			checkError(err)
@@ -212,7 +211,6 @@ func (this *ChordService) GetKeyInfo(msg *Msg, reply *Reply) error {
 
 			err = handler.Close()
 			checkError(err)
-			
 
 			// change my successor and update finger table entry
 			successorAddress = msg.SourceAddress
@@ -230,7 +228,7 @@ func (this *ChordService) GetKeyInfo(msg *Msg, reply *Reply) error {
 	} else {
 		// send to next best node
 		sendToNextBestNode(msg)
-		reply.Val = <- rpcChain
+		reply.Val = <-rpcChain
 	}
 	return nil
 
@@ -254,7 +252,7 @@ func (this *ChordService) SetPredecessor(msg *Msg, reply *Reply) error {
 		//printFingerTable()
 	} else {
 		sectionedPrint("Empty string recived. Can't set predecessor.")
-	//	reply.Val = "NACK"
+		//	reply.Val = "NACK"
 	}
 	return nil
 }
@@ -275,7 +273,7 @@ func (this *ChordService) SetSuccessor(msg *Msg, reply *Reply) error {
 		//printFingerTable()
 	} else {
 		sectionedPrint("Empty string recived. Can't set successor.")
-	//	reply.Val = "NACK"
+		//	reply.Val = "NACK"
 	}
 	return nil
 }
@@ -314,7 +312,7 @@ func (this *ChordService) ProposeSuccessor(msg *Msg, reply *Reply) error {
 	if successorAddress == "" {
 		// accept proposal
 		successorAddress = msg.Val
-		successorIdentifier = getIdentifier(msg.Val) 
+		successorIdentifier = getIdentifier(msg.Val)
 		successorHandler = getRpcHandler(predecessorAddress)
 
 		// set accepted node's predecessor to this node
@@ -342,7 +340,6 @@ func (this *ChordService) GetFtAddress(msg *Msg, reply *Reply) error {
 /*				RPC FUNCTIONS (INBOUND) END			*/
 //////////////////////////////////////////////////////
 
-
 //////////////////////////////////////////////////////
 /*			PUBLIC FUNCTIONS START					*/
 //////////////////////////////////////////////////////
@@ -356,7 +353,7 @@ func GetAddressForSegment(filename string) string {
 	fileIdentifier := getIdentifier(filename)
 
 	var reply Reply
-	msg := Msg {nodeAddress, filename, fileIdentifier, "file", ""}
+	msg := Msg{nodeAddress, filename, fileIdentifier, "file", ""}
 	handler := getRpcHandler(successorAddress)
 	err := handler.Call("ChordService.GetKeyInfo", &msg, &reply)
 	checkError(err)
@@ -486,41 +483,41 @@ func manageHeartbeats() {
 	}
 }
 
-/* 
+/*
 * Set up the listener for RPC requests, serve the connections when required.
-*/
+ */
 func launchRPCService() {
-  // Set up RPC service
-  server := new(ChordService)
-  rpc.Register(server)
-  rpcAddr, err := net.ResolveTCPAddr("tcp", nodeAddress)
-  checkError(err)
-  rpcListener, err := net.ListenTCP("tcp", rpcAddr)
-  checkError(err)
+	// Set up RPC service
+	server := new(ChordService)
+	rpc.Register(server)
+	rpcAddr, err := net.ResolveTCPAddr("tcp", nodeAddress)
+	checkError(err)
+	rpcListener, err := net.ListenTCP("tcp", rpcAddr)
+	checkError(err)
 
-  // Listen for RPC requests and serve concurrently
-  for {
-    newRPCConnection, err := rpcListener.AcceptTCP()
-    checkError(err)
-    go rpc.ServeConn(newRPCConnection) // Serve a request concurrently
-  }
-  rpcListener.Close()
+	// Listen for RPC requests and serve concurrently
+	for {
+		newRPCConnection, err := rpcListener.AcceptTCP()
+		checkError(err)
+		go rpc.ServeConn(newRPCConnection) // Serve a request concurrently
+	}
+	rpcListener.Close()
 }
 
 /*
 * Initializes finger table populating entries from iden+2^0 to iden+2^m
-*/
+ */
 func populateFingerTable() {
 	var str string
 
 	for i := 0; i < int(m); i++ {
-		key := int64( math.Mod( float64(nodeIdentifier) + math.Pow(2, float64(i)), math.Pow(2, float64(m)) ) )
+		key := int64(math.Mod(float64(nodeIdentifier)+math.Pow(2, float64(i)), math.Pow(2, float64(m))))
 
 		if betweenIdentifiers(key) {
 			ftab[key] = successorAddress
 		} else {
 			var reply Reply
-			msg := Msg {nodeAddress, "", key, "ftab", ""}
+			msg := Msg{nodeAddress, "", key, "ftab", ""}
 			handler := getRpcHandler(successorAddress)
 			err := handler.Call("ChordService.GetKeyInfo", &msg, &reply)
 			checkError(err)
@@ -544,7 +541,7 @@ func populateFingerTable() {
 //   }
 // }
 
-func getRpcHandler(rpcAddr string) (*rpc.Client) {
+func getRpcHandler(rpcAddr string) *rpc.Client {
 	if rpcAddr == "" {
 		fmt.Println("Received null string!!!")
 		return nil
@@ -553,7 +550,7 @@ func getRpcHandler(rpcAddr string) (*rpc.Client) {
 	var nodeRPCHandler *rpc.Client
 	//fmt.Println("Dialing address: ", rpcAddr)
 	nodeRPCHandler, err := rpc.Dial("tcp", rpcAddr)
-	
+
 	checkError(err)
 	//defer nodeRPCHandler.Close()
 	return nodeRPCHandler
@@ -561,7 +558,7 @@ func getRpcHandler(rpcAddr string) (*rpc.Client) {
 
 /*
 * Sends to next best candidate for finding KeyIdentifier by searching through finger table
-*/
+ */
 func sendToNextBestNode(msg *Msg) {
 	var closestNode string
 	var maxIden int64 = -1
@@ -571,13 +568,13 @@ func sendToNextBestNode(msg *Msg) {
 		if nodeIden > maxIden && nodeIden < msg.KeyIdentifier {
 			maxIden = nodeIden
 			closestNode = nodeAddr
-		}	
+		}
 	}
 	if closestNode == "" || closestNode == nodeAddress {
 		closestNode = predecessorAddress
 	}
 
-  	var reply Reply
+	var reply Reply
 	handler := getRpcHandler(closestNode)
 	err := handler.Call("ChordService.GetKeyInfo", &msg, &reply)
 	checkError(err)
@@ -590,63 +587,63 @@ func sendToNextBestNode(msg *Msg) {
 
 /*
 * Returns an int64 identifier for an input key
-*/
+ */
 func getIdentifier(key string) int64 {
-  id := computeSHA1Hash(key)
-  k := big.NewInt(0)
-  if _, ok := k.SetString(id, 16); ok {
-    //fmt.Println("Number: ", k)
-  } else {
-    //fmt.Println("Unable to parse into big int")
-  }
-  power := int64(math.Pow(2, m))
-  ret := (k.Mod(k, big.NewInt(power))).Int64()
+	id := computeSHA1Hash(key)
+	k := big.NewInt(0)
+	if _, ok := k.SetString(id, 16); ok {
+		//fmt.Println("Number: ", k)
+	} else {
+		//fmt.Println("Unable to parse into big int")
+	}
+	power := int64(math.Pow(2, m))
+	ret := (k.Mod(k, big.NewInt(power))).Int64()
 
-  //fmt.Println("Identifier for ", key, " : ", ret)
+	//fmt.Println("Identifier for ", key, " : ", ret)
 
-  return ret
+	return ret
 }
 
 /*
 * Checks if an identifier iden lies between this node and its successor
-*/
+ */
 func betweenIdentifiers(iden int64) bool {
-  if successorIdentifier == -1 {
-  	return false
-  }
-  if successorIdentifier < nodeIdentifier {
-    if iden > nodeIdentifier && iden > successorIdentifier {
-      return true
-    } else if iden < nodeIdentifier && iden < successorIdentifier {
-      return true
-    }
-  } else if successorIdentifier > nodeIdentifier {
-    if iden > nodeIdentifier && iden < successorIdentifier {
-      return true
-    }
-  }
-  return false
+	if successorIdentifier == -1 {
+		return false
+	}
+	if successorIdentifier < nodeIdentifier {
+		if iden > nodeIdentifier && iden > successorIdentifier {
+			return true
+		} else if iden < nodeIdentifier && iden < successorIdentifier {
+			return true
+		}
+	} else if successorIdentifier > nodeIdentifier {
+		if iden > nodeIdentifier && iden < successorIdentifier {
+			return true
+		}
+	}
+	return false
 }
 
 /*
 * Checks error value and prints/exits if non nil.
-*/
+ */
 func checkError(err error) {
-  if err != nil {
-    fmt.Println("Error thrown: ", err)
-    os.Exit(-1)
-  }
+	if err != nil {
+		fmt.Println("Error thrown: ", err)
+		os.Exit(-1)
+	}
 }
 
 /*
 * Returns the SHA1 hash Value of input key as a string
-*/
+ */
 func computeSHA1Hash(key string) string {
-  buf := []byte(key)
-  h := sha1.New()
-  h.Write(buf)
-  str := hex.EncodeToString(h.Sum(nil))
-  return str
+	buf := []byte(key)
+	h := sha1.New()
+	h.Write(buf)
+	str := hex.EncodeToString(h.Sum(nil))
+	return str
 }
 
 func sectionedPrint(str string) {
@@ -658,14 +655,14 @@ func sectionedPrint(str string) {
 /* Prints the finger table entries to standard output.
  */
 func printFingerTable() {
-  fmt.Println(" -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ ")
-  fmt.Printf(" Finger table (unordered) for this node: %d\n", nodeIdentifier)
-  fmt.Println(" -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ ")
-  fmt.Printf("| ID   |    VAL    |\n")
+	fmt.Println(" -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ ")
+	fmt.Printf(" Finger table (unordered) for this node: %d\n", nodeIdentifier)
+	fmt.Println(" -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ ")
+	fmt.Printf("| ID   |    VAL    |\n")
 
-  // Runs up to size m.
-  for id := range ftab {
-    fmt.Printf("| %3d  | %9s |\n", id, ftab[id])
-  }
-  fmt.Println(" -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ ")
+	// Runs up to size m.
+	for id := range ftab {
+		fmt.Printf("| %3d  | %9s |\n", id, ftab[id])
+	}
+	fmt.Println(" -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ ")
 }

@@ -8,16 +8,16 @@ import (
 	//"bufio"
 	"fmt"
 	"os"
-	"strings"
 	"strconv"
+	"strings"
 )
 
 var (
-	chordAddress 	string
-	ftAddress  		string
-	peerAddress 	string
+	chordAddress string
+	ftAddress    string
+	peerAddress  string
 	//peerAddress1 	string
-	vid          []byte
+	vid []byte
 )
 
 func main() {
@@ -45,7 +45,7 @@ func main() {
 	var shareFile string
 	fmt.Println("Please enter name of file you wish to share: ")
 	fmt.Scan(&shareFile)
-	if shareFile != "" {	
+	if shareFile != "" {
 		filemgmt.SplitFile(shareFile)
 		fmt.Println("File splitting complete.")
 	}
@@ -65,7 +65,7 @@ func main() {
 			fmt.Println("Found node with address %s\n", addr)
 			// now send file to addr
 			if addr != ftAddress {
-				//filemgmt.PrintFileSysContents(localFileSystem)			
+				//filemgmt.PrintFileSysContents(localFileSystem)
 				vidSeg := transfer.GetVideoSegment(shareFile, segNums, i, ftAddress)
 				transfer.SendVideoSegment(shareFile, addr, int(segNums), vidSeg)
 				fmt.Printf("Sent segment # %d\n", i)
@@ -125,5 +125,7 @@ func main() {
 	// } else {
 	// 	fmt.Println("File is unavailable")
 	// }
+	for {
+	}
 	fmt.Println("Exiting...")
 }
