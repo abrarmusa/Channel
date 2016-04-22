@@ -11,10 +11,6 @@ import (
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-// debug(str string)
-// --------------------------------------------------------------------------------------------
-// DESCRIPTION:
-// -------------------
 // Prints message into console in magenta
 // -------------------
 // INSTRUCTIONS:
@@ -26,10 +22,6 @@ func Debug(str string) {
 	color.Unset()
 }
 
-// warning(str string)
-// --------------------------------------------------------------------------------------------
-// DESCRIPTION:
-// -------------------
 // Prints message into console in yellow
 // -------------------
 // INSTRUCTIONS:
@@ -41,10 +33,6 @@ func Warning(str string) {
 	color.Unset()
 }
 
-// debug(str string)
-// --------------------------------------------------------------------------------------------
-// DESCRIPTION:
-// -------------------
 // Prints message into console in magenta
 func Alert(str string) {
 	color.Set(color.FgRed)
@@ -52,10 +40,6 @@ func Alert(str string) {
 	color.Unset()
 }
 
-// blue(str string)
-// --------------------------------------------------------------------------------------------
-// DESCRIPTION:
-// -------------------
 // Prints message into console in blue
 // -------------------
 // INSTRUCTIONS:
@@ -67,10 +51,6 @@ func Blue(str string) {
 	color.Unset()
 }
 
-// info(str string)
-// --------------------------------------------------------------------------------------------
-// DESCRIPTION:
-// -------------------
 // Prints message into console in green
 // -------------------
 // INSTRUCTIONS:

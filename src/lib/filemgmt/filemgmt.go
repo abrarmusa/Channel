@@ -12,18 +12,7 @@ import (
 	"strings"
 )
 
-// SplitFile(filename string)
-// --------------------------------------------------------------------------------------------
-// DESCRIPTION:
-// -------------------
 // Converts a file into several json encoded segments
-// TAG DETAILS:
-// 0 -> File will be split for testing 1 node
-// n > 0 -> File will be split for testing on n nodes
-// -------------------
-// INSTRUCTIONS:
-// -------------------
-// Call filemgmt.SplitFile("{your filename}", {tag})
 func SplitFile(filename string, tag int) {
 	bytes, err := ioutil.ReadFile(filename)
 	utility.CheckError(err)
@@ -59,10 +48,6 @@ func SplitFile(filename string, tag int) {
 
 }
 
-// func ProcessLocalFiles(fileSys *utility.FileSys)
-// --------------------------------------------------------------------------------------------
-// DESCRIPTION:
-// -------------------
 // Looks into the json for a filename and processes the segments into the filesystem.
 // NOTE: A POINTER TO THE LOCAL FILESYSTEM MUST BE INPUT
 func ProcessLocalFiles(localFileSys *utility.FileSys) {
@@ -116,10 +101,6 @@ func ProcessLocalFiles(localFileSys *utility.FileSys) {
 	fmt.Println("===============================    PROCESSING COMPLETE    ================================\n\n\n")
 }
 
-// writeToFileHelper()
-// --------------------------------------------------------------------------------------------
-// DESCRIPTION:
-// -------------------
 // This method writes the downloaded file into a file of its own in the filesys/downloaded folder
 func writeToFileHelper(foldername string, ident int, data []byte) {
 	str := consts.DirPath + consts.LocalPath + foldername + "/" + foldername + "_" + strconv.Itoa(ident)
@@ -127,10 +108,6 @@ func writeToFileHelper(foldername string, ident int, data []byte) {
 	utility.CheckError(err)
 }
 
-// procName(filename string) string
-// --------------------------------------------------------------------------------------------
-// DESCRIPTION:
-// -------------------
 // Processes the filename into the appropriate folder name for the segments to be stored
 func procName(filename string) string {
 	str := strings.Split(filename, "/")
@@ -139,10 +116,6 @@ func procName(filename string) string {
 	return filename[:dotindex]
 }
 
-// printFileSysContents(localFileSys *utility.FileSys)
-// --------------------------------------------------------------------------------------------
-// DESCRIPTION:
-// -------------------
 // Print the filesystem contents
 func PrintFileSysContents(localFileSys *utility.FileSys) {
 	colorprint.Debug("READING CONTENTS OF FILE SYSTEM NO. " + strconv.Itoa(localFileSys.Id))
@@ -169,43 +142,37 @@ func PrintFileSysContents(localFileSys *utility.FileSys) {
 	colorprint.Warning("======================================================================================================")
 }
 
-// // addVidSegIntoFileSys(filename string, vidSeg utility.VidSegment) {
-// --------------------------------------------------------------------------------------------
-// DESCRIPTION:
-// -------------------
 // Adds the video segment info into localFiles.json. Call this function after adding a new video segment to the file system
 func AddVidSegIntoFileSys(filename string, segNums int64, vidSeg utility.VidSegment, localFileSys *utility.FileSys) {
-	localFileSys.RLock()
-	// colorprint.Debug("LOCK")
-	_, ok := localFileSys.Files[filename]
-	localFileSys.RUnlock()
-	if ok {
-		localFileSys.Files[filename].Segments[vidSeg.Id] = vidSeg
-	} else {
-		var vidmap map[int]utility.VidSegment
-		var arr []int64
-		arr = append(arr, int64(vidSeg.Id))
-		vidmap[vidSeg.Id] = vidSeg
-		vid := utility.Video{
-			Name:      filename,
-			SegNums:   segNums,
-			SegsAvail: arr,
-			Segments:  vidmap,
-		}
-		localFileSys.Lock()
-		localFileSys.Files[filename] = vid
-		localFileSys.Unlock()
+	// localFileSys.RLock()
+	// // colorprint.Debug("LOCK")
+	// _, ok := localFileSys.Files[filename]
+	// localFileSys.RUnlock()
+	// if ok {
+	// 	localFileSys.Files[filename].Segments[vidSeg.Id] = vidSeg
+	// } else {
+	// 	var vidmap map[int]utility.VidSegment
+	// 	var arr []int64
+	// 	arr = append(arr, int64(vidSeg.Id))
+	// 	vidmap[vidSeg.Id] = vidSeg
+	// 	vid := utility.Video{
+	// 		Name:      filename,
+	// 		SegNums:   segNums,
+	// 		SegsAvail: arr,
+	// 		Segments:  vidmap,
+	// 	}
+	// 	localFileSys.Lock()
+	// 	localFileSys.Files[filename] = vid
+	// 	localFileSys.Unlock()
 
-	}
+	// }
 	foldername := procName(filename)
-	writeToFileHelper(foldername, vidSeg.Id, vidSeg.Body)
+	data, err := json.Marshal(vidSeg)
+	utility.CheckError(err)
+	writeToFileHelper(foldername, vidSeg.Id, data)
 	// colorprint.Debug("UNLOCK")
 }
 
-// // addVidSegIntoFileSysJSON(filename string, vidSeg utility.VidSegment) {
-// --------------------------------------------------------------------------------------------
-// DESCRIPTION:
-// -------------------
 // Adds the video segment info into localFiles.json. Call this function after adding a new video segment to the file system
 func addVidSegIntoFileSysJSON(filename string, path string, segNums int, vidSeg utility.VidSegment) {
 	vidSegId := int64(vidSeg.Id)
