@@ -95,7 +95,8 @@ func CheckError(err error) {
 func SaveFileInfoToJson(jsondata []byte) {
 	jsonFile, err := os.Create(consts.DirPath + "/localFiles.json")
 	CheckError(err)
-	jsonFile.Write(jsondata)
+	_, err = jsonFile.Write(jsondata)
+	CheckError(err)
 	jsonFile.Close()
 }
 
