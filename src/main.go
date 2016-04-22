@@ -42,25 +42,11 @@ func main() {
 	// Init chord
 	go chordRPC.Start(chordAddress, peerAddress, ftAddress)
 
-
-	/////////////////
-
-	// var input string
-	// var fname string
-	// for i := 0; i >= 0; i++ {
-	// 	fmt.Println()
-	// 	fmt.Println(">>>> Please enter a command")
-	// 	fmt.Scan(&input)
-	// 	cmd := input
-	// 	if input == "get" {
-	// 	}
-	// }
-
 	var shareFile string
 	fmt.Println("Please enter name of file you wish to share: ")
 	fmt.Scan(&shareFile)
 	if shareFile != "" {	
-		filemgmt.SplitFile(shareFile, -1)
+		filemgmt.SplitFile(shareFile)
 		fmt.Println("File splitting complete.")
 	}
 
@@ -68,18 +54,24 @@ func main() {
 	fnArr := strings.Split(shareFile, ".")
 	available, segNums, _ := transfer.CheckFileAvailability(shareFile, ftAddress)
 	fmt.Printf("Total segments available to distribute: %d\n", segNums)
+	// TODO: Delay
 	if available {
 		fmt.Println("Available. Commencing file load balancing...")
 
 		// for all segs, distribute
-		for i := 0; i < int(segNums); i++ {
+		for i := 1; i <= int(segNums); i++ {
 			filename := fnArr[0] + "_" + strconv.FormatInt(int64(i), 10)
 			addr := chordRPC.GetAddressForSegment(filename)
-
+			fmt.Println("Found node with address %s\n", addr)
 			// now send file to addr
-			vidSeg := transfer.GetVideoSegment(shareFile, segNums, i, ftAddress)
-			transfer.SendVideoSegment(shareFile, addr, int(segNums), vidSeg)
-			fmt.Printf("Sent segments # %d\n", i)
+			if addr != ftAddress {
+				//filemgmt.PrintFileSysContents(localFileSystem)			
+				vidSeg := transfer.GetVideoSegment(shareFile, segNums, i, ftAddress)
+				transfer.SendVideoSegment(shareFile, addr, int(segNums), vidSeg)
+				fmt.Printf("Sent segment # %d\n", i)
+			} else {
+				fmt.Println("This node already stores the segment")
+			}
 		}
 	}
 
@@ -92,7 +84,7 @@ func main() {
 		go player.Run()
 		fmt.Printf("Preparing to stream %s\n", streamFile)
 
-		for i := 0; i < int(segNums); i++ {
+		for i := 1; i <= int(segNums); i++ {
 			filename := fnArr[0] + "_" + strconv.FormatInt(int64(i), 10)
 			addr := chordRPC.GetAddressForSegment(filename)
 

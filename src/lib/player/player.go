@@ -72,6 +72,7 @@ func ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	colorprint.Debug("CLOSING")
 	close(ByteChan)
 	close(CloseStream)
+	for {}
 
 }
 

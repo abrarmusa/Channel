@@ -124,6 +124,7 @@ func (service *Service) GetFileSegment(segReq *utility.ReqStruct, segment *utili
 		outputstr += ("Node is asking for segment no. " + strconv.Itoa(segReq.SegmentId) + " for " + segReq.Filename)
 		_, ok := (video.Segments[1])
 		seg, ok = video.Segments[segReq.SegmentId]
+		fmt.Println(segReq.SegmentId)
 		if ok {
 			segment.Body = seg.Body
 		} else {

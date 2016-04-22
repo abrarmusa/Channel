@@ -108,6 +108,9 @@ func Start (nodeAddr string, peerAddr string, fileTransAddr string) {
 		checkError(err)
 		fmt.Printf("Reply received for GetKeyInfo: %s\n", reply.Val)
 
+		err = handler.Close()
+		checkError(err)
+
 		// wait to get successor and predecessor
 		for successorAddress == "" || predecessorAddress == "" {
 			sectionedPrint("No successor and predecessor addresses. Waiting ...")
@@ -120,7 +123,7 @@ func Start (nodeAddr string, peerAddr string, fileTransAddr string) {
 		printFingerTable()
 	}
 
-	go manageHeartbeats()
+	//go manageHeartbeats()
 
 	for {
 		runtime.Gosched()
@@ -154,6 +157,10 @@ func (this *ChordService) GetKeyInfo(msg *Msg, reply *Reply) error {
 		checkError(err)
 		//fmt.Printf("Reply received for SetPredecessor: %s\n",reply.Val)
 		// set new node as my successor and predecessor
+
+		err = handler.Close()
+		checkError(err)
+
 		successorAddress = msg.SourceAddress
 		successorIdentifier = getIdentifier(msg.SourceAddress)
 		successorHandler = getRpcHandler(successorAddress)
@@ -201,7 +208,11 @@ func (this *ChordService) GetKeyInfo(msg *Msg, reply *Reply) error {
 			handler = getRpcHandler(successorAddress)
 			err = handler.Call("ChordService.SetPredecessor", &msg0, &reply)
 			checkError(err)
-			//fmt.Printf("Reply received for SetPredecessor: %s\n",reply.Val)			
+			//fmt.Printf("Reply received for SetPredecessor: %s\n",reply.Val)
+
+			err = handler.Close()
+			checkError(err)
+			
 
 			// change my successor and update finger table entry
 			successorAddress = msg.SourceAddress
@@ -337,6 +348,11 @@ func (this *ChordService) GetFtAddress(msg *Msg, reply *Reply) error {
 //////////////////////////////////////////////////////
 
 func GetAddressForSegment(filename string) string {
+	if successorAddress == "" && predecessorAddress == "" {
+		fmt.Println("Only one node in system. Returning own ftAddress")
+		return ftAddr
+	}
+
 	fileIdentifier := getIdentifier(filename)
 
 	var reply Reply
@@ -347,12 +363,18 @@ func GetAddressForSegment(filename string) string {
 	str := fmt.Sprintf("Reply received for getting file transfer address: %s\n", reply.Val)
 	sectionedPrint(str)
 
+	err = handler.Close()
+	checkError(err)
+
 	// get file transfer address and return
 	handler = getRpcHandler(reply.Val)
 	err = handler.Call("ChordService.GetFtAddress", &msg, &reply)
 	checkError(err)
 	str = fmt.Sprintf("File transfer address: %s\n", reply.Val)
 	sectionedPrint(str)
+
+	err = handler.Close()
+	checkError(err)
 
 	return reply.Val
 }
@@ -383,6 +405,9 @@ func findSuccessor() {
 		}
 		str := fmt.Sprintf("Received reply for predecessor proposal from %s: %s\n", addr, reply.Val)
 		sectionedPrint(str)
+
+		err = handler.Close()
+		checkError(err)
 	}
 }
 
@@ -404,6 +429,9 @@ func findPredecessor() {
 		}
 		str := fmt.Sprintf("Received reply for successor proposal from %s: %s\n", addr, reply.Val)
 		sectionedPrint(str)
+
+		err = handler.Close()
+		checkError(err)
 	}
 }
 
@@ -500,6 +528,9 @@ func populateFingerTable() {
 			sectionedPrint(str)
 
 			ftab[key] = reply.Val
+
+			err = handler.Close()
+			checkError(err)
 		}
 	}
 
@@ -514,6 +545,10 @@ func populateFingerTable() {
 // }
 
 func getRpcHandler(rpcAddr string) (*rpc.Client) {
+	if rpcAddr == "" {
+		fmt.Println("Received null string!!!")
+		return nil
+	}
 	//var err error
 	var nodeRPCHandler *rpc.Client
 	//fmt.Println("Dialing address: ", rpcAddr)
@@ -548,6 +583,9 @@ func sendToNextBestNode(msg *Msg) {
 	checkError(err)
 	//fmt.Printf("Reply received for rpcChain: %s\n", reply.Val)
 	rpcChain <- reply.Val
+
+	err = handler.Close()
+	checkError(err)
 }
 
 /*
@@ -612,9 +650,9 @@ func computeSHA1Hash(key string) string {
 }
 
 func sectionedPrint(str string) {
-	// fmt.Println("=====================================================")
-	// fmt.Println(str)
-	// fmt.Println("=====================================================")
+	fmt.Println("=====================================================")
+	fmt.Println(str)
+	fmt.Println("=====================================================")
 }
 
 /* Prints the finger table entries to standard output.
