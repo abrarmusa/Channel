@@ -40,7 +40,6 @@ type SeqStruct struct {
 	Segment   VidSegment
 }
 
---
 // This struct holds the VidSegments of a particular video file. SegNums refers to the total number of segments in the entire video.
 // This colorprint.Info is used to reorder the segments when playing the video stream.
 type Video struct {

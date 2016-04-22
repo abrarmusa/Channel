@@ -150,7 +150,7 @@ func (service *Service) ReceiveFileSegment(seqStruct *utility.SeqStruct, segment
 	colorprint.Debug("INBOUND RPC REQUEST: Receiving video segment for " + seqStruct.Filename)
 	// localFileSys.Lock()
 	filemgmt.AddVidSegIntoFileSys(filename, int64(seqStruct.SegNums), seqStruct.Segment, &localFileSys)
-	outputstr += ("\nSegment " + strconv.Itoa(segment.Id) + " received for " + filename)
+	outputstr += ("\nSegment " + strconv.Itoa(seqStruct.Segment.Id) + " received for " + filename)
 	colorprint.Warning(outputstr)
 	//localFileSys.Unlock()
 	colorprint.Warning("Video Segment saved on the node")
