@@ -1,3 +1,6 @@
+// govec regex: (?<host>\S*) (?<clock>{.*})(?<event>.*)\n
+// less buggy: (?<event>.*)\n(?<host>\S*) (?<clock>{.*})
+
 package main
 
 import (
@@ -12,6 +15,7 @@ import (
   	"runtime"
   	"time"
     gov "github.com/arcaneiceman/GoVector/govec"
+    "sort"
 )
 
 type (
@@ -68,10 +72,10 @@ func launchUDPGoVecListener(src string) {
   for {
     n, addr, _ := conn.ReadFrom(buf[0:])
     incommingMessage := new(Vec)
-    Logger.UnpackReceive("Received Message From Client", buf[0:n], &incommingMessage)
+    Logger.UnpackReceive("Received RPC request", buf[0:n], &incommingMessage)
 
     outgoingMessage := Vec{"GoVecs Great?", time.Now().String()}
-    conn.WriteTo(Logger.PrepareSend("Replying to client", outgoingMessage), addr)
+    conn.WriteTo(Logger.PrepareSend("Replying to RPC call", outgoingMessage), addr)
     time.Sleep(1)
   }
   conn.Close()
@@ -127,19 +131,21 @@ func main () {
 		msg := Msg {nodeAddress, nodeAddress, nodeIdentifier, "node", ""}
 		handler := getRpcHandler(peerAddress)
 
+    // Govec send
     conn := setupConnection(peerAddress, nodeAddress)
     outgoingMessage := Vec{"Hello GoVec!", time.Now().String()}
-    outBuf := Logger.PrepareSend("Sending message to server", outgoingMessage)
+    outBuf := Logger.PrepareSend("Calling ChordService.GetKeyInfo", outgoingMessage)
     _, _ = conn.Write(outBuf)
 
 		err := handler.Call("ChordService.GetKeyInfo", &msg, &reply)
 		checkError(err)
 		fmt.Printf("Reply received for GetKeyInfo: %s\n", reply.Val)
 
+    // Govec reply
     var inBuf [512]byte
     n, _ := conn.Read(inBuf[0:])
     incommingMessage := new(Vec)
-    Logger.UnpackReceive("Received Message from server", inBuf[0:n], &incommingMessage)
+    Logger.UnpackReceive("Received ChordService.GetKeyInfo reply", inBuf[0:n], &incommingMessage)
     conn.Close()
 
 		// wait to get successor and predecessor
@@ -184,10 +190,38 @@ func (this *ChordService) GetKeyInfo(msg *Msg, reply *Reply) error {
     var reply Reply
     msg0 := Msg {nodeAddress, "", -1, "", nodeAddress}
     handler := getRpcHandler(msg.SourceAddress)
+
+    // Govec send
+    conn := setupConnection(msg.SourceAddress, nodeAddress)
+    outgoingMessage := Vec{"Hello GoVec!", time.Now().String()}
+    outBuf := Logger.PrepareSend("Calling ChordService.SetPredecessor", outgoingMessage)
+    _, _ = conn.Write(outBuf)
+
     err := handler.Call("ChordService.SetPredecessor", &msg0, &reply)
     checkError(err)
+
+    // Govec reply
+    var inBuf [512]byte
+    n, _ := conn.Read(inBuf[0:])
+    incommingMessage := new(Vec)
+    Logger.UnpackReceive("Received ChordService.SetPredecessor reply", inBuf[0:n], &incommingMessage)
+    conn.Close()
+
+    // Govec send
+    conn = setupConnection(msg.SourceAddress, nodeAddress)
+    outgoingMessage = Vec{"Hello GoVec!", time.Now().String()}
+    outBuf = Logger.PrepareSend("Calling ChordService.SetSuccessor", outgoingMessage)
+    _, _ = conn.Write(outBuf)
+
     err = handler.Call("ChordService.SetSuccessor", &msg0, &reply)
     checkError(err)
+
+    // Govec reply
+    n, _ = conn.Read(inBuf[0:])
+    incommingMessage = new(Vec)
+    Logger.UnpackReceive("Received ChordService.SetSuccessor reply", inBuf[0:n], &incommingMessage)
+    conn.Close()
+
     //fmt.Printf("Reply received for SetPredecessor: %s\n",reply.Val)
     // set new node as my successor and predecessor
     successorAddress = msg.SourceAddress
@@ -221,23 +255,54 @@ func (this *ChordService) GetKeyInfo(msg *Msg, reply *Reply) error {
       var reply Reply
       msg0 := Msg {nodeAddress, "", -1, "", nodeAddress}
       handler := getRpcHandler(msg.SourceAddress)
+
+      // Govec send
+      conn := setupConnection(msg.SourceAddress, nodeAddress)
+      outgoingMessage := Vec{"Hello GoVec!", time.Now().String()}
+      outBuf := Logger.PrepareSend("Calling ChordService.SetPredecessor", outgoingMessage)
+      _, _ = conn.Write(outBuf)
       err := handler.Call("ChordService.SetPredecessor", &msg0, &reply)
       checkError(err)
-      //fmt.Printf("Reply received for SetPredecessor: %s\n",reply.Val)
+      // Govec reply
+      var inBuf [512]byte
+      n, _ := conn.Read(inBuf[0:])
+      incommingMessage := new(Vec)
+      Logger.UnpackReceive("Received ChordService.SetPredecessor reply", inBuf[0:n], &incommingMessage)
+      conn.Close()
 
       msg0 = Msg {nodeAddress, "", -1, "", successorAddress}
       handler = getRpcHandler(msg.SourceAddress)
+
+      // Govec send
+      conn = setupConnection(msg.SourceAddress, nodeAddress)
+      outgoingMessage = Vec{"Hello GoVec!", time.Now().String()}
+      outBuf = Logger.PrepareSend("Calling ChordService.SetPredecessor", outgoingMessage)
+      _, _ = conn.Write(outBuf)
       err = handler.Call("ChordService.SetSuccessor", &msg0, &reply)
       checkError(err)
-      //fmt.Printf("Reply received for SetSuccessor: %s\n",reply.Val)
+      // Govec reply
+      n, _ = conn.Read(inBuf[0:])
+      incommingMessage = new(Vec)
+      Logger.UnpackReceive("Received ChordService.SetPredecessor reply", inBuf[0:n], &incommingMessage)
+      conn.Close()
 
       // ask my old successor to select new node as its predecessor TODO
       // Need: SetPredecessor() - make rpc call
       msg0 = Msg {nodeAddress, "", -1, "", msg.SourceAddress}
       handler = getRpcHandler(successorAddress)
+
+      // Govec send
+      conn = setupConnection(successorAddress, nodeAddress)
+      outgoingMessage = Vec{"Hello GoVec!", time.Now().String()}
+      outBuf = Logger.PrepareSend("Calling ChordService.SetPredecessor", outgoingMessage)
+      _, _ = conn.Write(outBuf)
       err = handler.Call("ChordService.SetPredecessor", &msg0, &reply)
       checkError(err)
-      //fmt.Printf("Reply received for SetPredecessor: %s\n",reply.Val)
+      // Govec reply
+      n, _ = conn.Read(inBuf[0:])
+      incommingMessage = new(Vec)
+      Logger.UnpackReceive("Received ChordService.SetPredecessor reply", inBuf[0:n], &incommingMessage)
+      conn.Close()
 
       // change my successor and update finger table entry
       successorAddress = msg.SourceAddress
@@ -318,7 +383,9 @@ func (this *ChordService) ProposePredecessor(msg *Msg, reply *Reply) error {
 		// set accepted node's successor to this node
 		var reply *Reply
 		msg := Msg{nodeAddress, nodeAddress, getIdentifier(nodeAddress), "node", nodeAddress}
-		err := predecessorHandler.Call("ChordService.SetSuccessor", &msg, &reply)
+
+    err := predecessorHandler.Call("ChordService.SetSuccessor", &msg, &reply)
+
 		if err != nil {
 			str = fmt.Sprintf("Received reply for predecessor propsal from %s: %s\n", predecessorAddress, reply.Val)
 			sectionedPrint(str)
@@ -345,7 +412,9 @@ func (this *ChordService) ProposeSuccessor(msg *Msg, reply *Reply) error {
 		// set accepted node's predecessor to this node
 		var reply *Reply
 		msg := Msg{nodeAddress, nodeAddress, getIdentifier(nodeAddress), "node", nodeAddress}
+
 		err := successorHandler.Call("ChordService.SetPredecessor", &msg, &reply)
+
 		if err != nil {
 			str = fmt.Sprintf("Received reply for successor propsal from %s: %s\n", successorAddress, reply.Val)
 			sectionedPrint(str)
@@ -377,8 +446,9 @@ func findSuccessor() {
 		}
 		//fmt.Printf("Identifier: %d\nAddress: %s\n", iden, addr)
 
-		handler = getRpcHandler(addr)
-		err := handler.Call("ChordService.ProposePredecessor", &msg, &reply)
+    handler = getRpcHandler(addr)
+    err := handler.Call("ChordService.ProposePredecessor", &msg, &reply)
+
 		if err != nil {
 			sectionedPrint("Error while proposing predecessor")
 			return
@@ -397,9 +467,21 @@ func findPredecessor() {
 		if addr == "unstable" {
 			continue
 		}
-		//fmt.Printf("Identifier: %d\nAddress: %s\n", iden, addr)
-		handler = getRpcHandler(addr)
-		err := handler.Call("ChordService.ProposeSuccessor", &msg, &reply)
+
+    // Govec send
+    conn := setupConnection(peerAddress, nodeAddress)
+    outgoingMessage := Vec{"Hello GoVec!", time.Now().String()}
+    outBuf := Logger.PrepareSend("Calling ChordService.ProposeSuccessor", outgoingMessage)
+    _, _ = conn.Write(outBuf)
+    handler = getRpcHandler(addr)
+    err := handler.Call("ChordService.ProposeSuccessor", &msg, &reply)
+    // Govec reply
+    var inBuf [512]byte
+    n, _ := conn.Read(inBuf[0:])
+    incommingMessage := new(Vec)
+    Logger.UnpackReceive("Received ChordService.ProposeSuccessor reply", inBuf[0:n], &incommingMessage)
+    conn.Close()
+
 		if err != nil {
 			fmt.Println("Error while proposing successor")
 			return
@@ -418,7 +500,9 @@ func manageHeartbeats() {
 		if successorHandler != nil {
 			// check successor
 			err := successorHandler.Call("ChordService.Heartbeat", &msg, &reply)
+
 			if err != nil {
+        Logger.LogLocalEvent("Lost track of successor")
 				sectionedPrint("Successor is DEAD!")
 
 				// adjust ftab
@@ -442,7 +526,9 @@ func manageHeartbeats() {
 		if predecessorHandler != nil {
 			// check predecessor
 			err := predecessorHandler.Call("ChordService.Heartbeat", &msg, &reply)
+
 			if err != nil {
+        Logger.LogLocalEvent("Lost track of immediate predecessor")
 				sectionedPrint("Predecessor is DEAD!")
 				predecessorAddress = ""
 				predecessorIdentifier = -1
@@ -627,10 +713,11 @@ func printFingerTable() {
   fmt.Println(" -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ ")
   fmt.Printf("| ID   |    VAL    |\n")
 
-  // Runs up to size m.
-  for id := range ftab {
-    fmt.Printf("| %3d  | %9s |\n", id, ftab[id])
-  }
+  keys := []int{}
+  for k, _ := range ftab { keys = append(keys,int(k)) }
+  sort.Ints(keys)
+  for _, k := range keys { fmt.Printf("| %3d  | %9s |\n", int64(k), ftab[int64(k)]) }
+
   fmt.Println(" -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ ")
 }
 

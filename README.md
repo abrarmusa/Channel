@@ -9,8 +9,8 @@ To run a node you can run the following command in the src the command
 `go run controller.go arg0 arg1 arg2 arg3 arg4`
 
 where:
-arg0: udp chord address for this node e.g :14321
-arg1: udp chord address of a known node in the system e.g :14322
+arg0: udp chord address for this node e.g :1431
+arg1: udp chord address of a known node in the system e.g :1432
 arg2: tcp rpc streaming server address e.g :1545
 arg3: tcp rpc streaming client address e.g :1237
 arg4: node name : has to be the same as folder in dir structure e.g node0
