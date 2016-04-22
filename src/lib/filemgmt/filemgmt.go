@@ -13,8 +13,8 @@ import (
 )
 
 // Converts a file into several json encoded segments
-func SplitFile(filename string, tag int) {
-	bytes, err := ioutil.ReadFile(filename)
+func SplitFile(filename string) {
+	bytes, err := ioutil.ReadFile(consts.DirPath + "/downloaded/" + filename)
 	utility.CheckError(err)
 	var eightBSeg []byte
 	var vidSeg utility.VidSegment
@@ -27,6 +27,7 @@ func SplitFile(filename string, tag int) {
 		ident := ((index / consts.Bytecount) + 1)
 		// colorprint.Debug(strconv.Itoa(index) + " " + strconv.Itoa(ident))
 		if counter == consts.Bytecount {
+			fmt.Printf("\rProcessing....")
 			counter = 0
 			vidSeg = utility.VidSegment{
 				Id:   ident,
@@ -35,13 +36,14 @@ func SplitFile(filename string, tag int) {
 			data, err := json.Marshal(vidSeg)
 			utility.CheckError(err)
 			eightBSeg = []byte{}
-
+			// fmt.Println(foldername)
 			if _, err := os.Stat(consts.DirPath + consts.LocalPath + foldername); os.IsNotExist(err) {
-				colorprint.Warning("Creating folder " + consts.DirPath + consts.LocalPath + foldername)
+				colorprint.Warning("Creating folder " + foldername)
 				err := os.MkdirAll(consts.DirPath+consts.LocalPath+foldername, 0777)
 				utility.CheckError(err)
 			}
 			writeToFileHelper(foldername, ident, data)
+			addVidSegIntoFileSysJSON(filename, (foldername), (len(bytes) / consts.Bytecount), vidSeg)
 		}
 		counter++
 	}
@@ -184,9 +186,10 @@ func addVidSegIntoFileSysJSON(filename string, path string, segNums int, vidSeg 
 	err = json.Unmarshal(locFiles, &filePaths)
 	utility.CheckError(err)
 	var filefound bool = false
-	for _, value := range filePaths.Files {
+	for index, value := range filePaths.Files {
 		if value.Name == filename {
 			value.SegsAvail = append(value.SegsAvail, vidSegId)
+			filePaths.Files[index].SegsAvail = value.SegsAvail
 			filefound = true
 			break
 		}
@@ -194,11 +197,11 @@ func addVidSegIntoFileSysJSON(filename string, path string, segNums int, vidSeg 
 	if !filefound {
 		var file utility.File
 		file.Name = filename
-		file.Path = path
+		file.Path = consts.DirPath + consts.LocalPath + path + "/"
 		file.SegNums = int64(segNums)
 		file.SegsAvail = append(file.SegsAvail, vidSegId)
+		filePaths.Files = append(filePaths.Files, file)
 	}
-
 	dat, err := json.Marshal(filePaths)
 	utility.CheckError(err)
 	utility.SaveFileInfoToJson(dat)

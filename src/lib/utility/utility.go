@@ -17,20 +17,17 @@ import (
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-
 // This struct holds a particular part of a video file. Id refers to the segment id and the body refers to the bytecount of the actual video bytes
 type VidSegment struct {
 	Id   int
 	Body []byte
 }
 
-
 // This struct holds the info for obtaining a video segment
 type ReqStruct struct {
 	Filename  string
 	SegmentId int
 }
-
 
 // This struct holds the fields for sending a video segment to be saved onto a node
 type SeqStruct struct {
@@ -49,7 +46,6 @@ type Video struct {
 	Segments  map[int]VidSegment
 }
 
-
 // This struct represents the local FileSystem to hold the Video's. Each FileSys object has an id and a map of Files with the keys to the map being the
 // actual filename.
 type FileSys struct {
@@ -57,7 +53,6 @@ type FileSys struct {
 	Files map[string]Video
 	sync.RWMutex
 }
-
 
 // This struct represents the Files as their names and the directory that they are located in
 type File struct {
@@ -67,12 +62,10 @@ type File struct {
 	SegsAvail []int64 `json:"segsavail"`
 }
 
-
 // This struct represents the filenames and their directory paths from which we are to read the files to be processed
 type FilePath struct {
 	Files []File `json:"Files"`
 }
-
 
 // This struct represents the response that an RPC call will write to. It is used to check if a node has a particular file and if it does, which parts
 // of that file it has in its local filesystem.
@@ -88,7 +81,6 @@ type Response struct {
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-
 // Prints error message into console in red
 func CheckError(err error) {
 	if err != nil {
@@ -103,7 +95,8 @@ func CheckError(err error) {
 func SaveFileInfoToJson(jsondata []byte) {
 	jsonFile, err := os.Create(consts.DirPath + "/localFiles.json")
 	CheckError(err)
-	jsonFile.Write(jsondata)
+	_, err = jsonFile.Write(jsondata)
+	CheckError(err)
 	jsonFile.Close()
 }
 
