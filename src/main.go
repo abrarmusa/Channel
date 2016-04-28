@@ -68,6 +68,7 @@ func main() {
 				//filemgmt.PrintFileSysContents(localFileSystem)
 				vidSeg := transfer.GetVideoSegment(shareFile, segNums, i, ftAddress)
 				transfer.SendVideoSegment(shareFile, addr, int(segNums), vidSeg)
+				chordRPC.SaveToMap(filename, vidSeg.Body)
 				fmt.Printf("Sent segment # %d\n", i)
 			} else {
 				fmt.Println("This node already stores the segment")

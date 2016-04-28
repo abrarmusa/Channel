@@ -29,8 +29,9 @@ type (
 
 	// Reply struct to be used as output argument in rpc calls
 	Reply struct {
-		Key string
-		Val string
+		Key     string
+		Val     string
+		DataMap map[string][]byte
 	}
 )
 
@@ -45,7 +46,11 @@ var (
 	predecessorAddress    string
 
 	// finger table as map of identifiers and addresses
-	ftab map[int64]string
+	ftab    map[int64]string
+	datamap map[string][]byte
+
+	predecessorMap map[string][]byte
+	successorMap   map[string][]byte
 
 	rpcChain           chan string // rpc chain channel to pass down value to the initiator
 	successorHandler   *rpc.Client
@@ -88,6 +93,7 @@ func Start(nodeAddr string, peerAddr string, fileTransAddr string) {
 	sectionedPrint(str)
 	// initialize finger table
 	ftab = make(map[int64]string)
+	datamap = make(map[string][]byte)
 
 	go launchRPCService()
 
@@ -128,6 +134,10 @@ func Start(nodeAddr string, peerAddr string, fileTransAddr string) {
 		runtime.Gosched()
 	}
 
+}
+
+func SaveToMap(filename string, data []byte) {
+	datamap[filename] = data
 }
 
 //////////////////////////////////////////////////////
@@ -236,6 +246,7 @@ func (this *ChordService) GetKeyInfo(msg *Msg, reply *Reply) error {
 
 func (this *ChordService) Heartbeat(msg *Msg, reply *Reply) error {
 	reply.Val = "Alive" + " : " + nodeAddress
+	reply.DataMap = datamap
 	return nil
 }
 
@@ -459,6 +470,7 @@ func manageHeartbeats() {
 				findSuccessor()
 			} else {
 				str = fmt.Sprintf("Successor's heartbeat reply: %s\n", reply.Val)
+				successorMap = reply.DataMap
 				sectionedPrint(str)
 			}
 		}
@@ -475,6 +487,7 @@ func manageHeartbeats() {
 				//findPredecessor()
 			} else {
 				str = fmt.Sprintf("Predecessor's heartbeat reply: %s\n", reply.Val)
+				predecessorMap = reply.DataMap
 				sectionedPrint(str)
 			}
 		}
